@@ -1,0 +1,17 @@
+{
+  "uuid": "8d5f28cd-e52e-433a-a277-0c6859a8dd00",
+  "shortName": "Sky-Watch-Pebble",
+  "longName": "Sky-Watch-Pebble",
+  "companyName": "MakeAwesomeHappen",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {
+    "dummy": 0
+  },
+  "resources": {
+    "media": []
+  }
+}
