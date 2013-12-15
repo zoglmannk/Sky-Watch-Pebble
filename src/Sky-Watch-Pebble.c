@@ -7,11 +7,11 @@ static TextLayer *text_layer3;
 static TextLayer *text_layer4;
 static TextLayer *text_layer5;
 static TextLayer *text_layer6;
-static TextLayer *text_layer7;
-static TextLayer *text_layer8;
-static int counter = 0; //notice how this is reset when watch face reloads
+static TextLayer *time_layer;
+static TextLayer *date_layer;
 
 #define GLOBAL_COUNTER_STORAGE_KEY 1000
+
 
 static int get_global_counter(void) {
 
@@ -37,28 +37,41 @@ static char* line_3_buf;
 static char* line_4_buf;
 static char* line_5_buf;
 static char* line_6_buf;
-static char* line_7_buf;
-static char* line_8_buf;
+static char* time_buf;
+static char* date_buf;
+
+static void setup_date_buf(void) {
+  time_t* clock = malloc(sizeof(time_t));
+  time(clock); //update clock to current time
+  struct tm* tm = localtime(clock);
+  memset(date_buf, 0, BUFFER_SIZE);
+  strftime(date_buf, BUFFER_SIZE, "%b %d", tm);
+
+  free(clock);
+}
 
 static void setup_time_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
-  time(clock); //fetch clock to current time
+  time(clock); //update clock to current time
   struct tm* tm = localtime(clock);
   char* tmp = malloc(BUFFER_SIZE * sizeof(char));
   memset(tmp, 0, BUFFER_SIZE);
+  //see https://sourceware.org/newlib/libc.html#Timefns for format
   strftime(tmp, BUFFER_SIZE, "%I:%M", tm);
-  memset(line_7_buf, 0, BUFFER_SIZE);
+  memset(time_buf, 0, BUFFER_SIZE);
   if(tmp[0] == '0') {
     //remove leading zero
-    strncpy(line_7_buf, (char*) &tmp[1], BUFFER_SIZE-1);
+    strncpy(time_buf, (char*) &tmp[1], BUFFER_SIZE-1);
   } else {
-    strcpy(line_7_buf, tmp);
+    strcpy(time_buf, tmp);
   }
   free(tmp);
   free(clock);
 }
 
-static void update_layer_callback(Layer *layer, GContext* ctx) {
+
+//draws the horizontal line across the display
+static void draw_line_callback(Layer *layer, GContext* ctx) {
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_draw_line(ctx, (GPoint) { 0, 0 }, (GPoint) { 144,0 });
 }
@@ -114,7 +127,7 @@ static void window_load(Window *window) {
 
   //setup creation of lines
   Layer *line_layer = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
-  layer_set_update_proc(line_layer, update_layer_callback);
+  layer_set_update_proc(line_layer, draw_line_callback);
   layer_add_child(window_layer, line_layer);
 
   //set 5th line of text
@@ -140,29 +153,29 @@ static void window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(text_layer6));
 
   //set 7th line of text
-  text_layer7 = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
-  text_layer_set_background_color(text_layer7, GColorBlack);
-  text_layer_set_text_color(text_layer7, GColorWhite);
+  time_layer = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
+  text_layer_set_background_color(time_layer, GColorBlack);
+  text_layer_set_text_color(time_layer, GColorWhite);
 
   setup_time_buf();
 
-  //text_layer_set_text(text_layer7, "12:44"); //widest?
-  text_layer_set_text(text_layer7, line_7_buf);
-  text_layer_set_font(text_layer7, fonts_get_system_font("RESOURCE_ID_BITHAM_30_BLACK"));
-  text_layer_set_text_alignment(text_layer7, GTextAlignmentLeft);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer7));
+  //text_layer_set_text(time_layer, "12:44"); //widest?
+  text_layer_set_text(time_layer, time_buf);
+  text_layer_set_font(time_layer, fonts_get_system_font("RESOURCE_ID_BITHAM_30_BLACK"));
+  text_layer_set_text_alignment(time_layer, GTextAlignmentLeft);
+  layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
   //set 8th line of text
-  text_layer8 = text_layer_create((GRect) { .origin = { 90, 0+24+24+24+24+38+5}, .size = { 144-90-5, 24} });
-  text_layer_set_background_color(text_layer8, GColorBlack);
-  text_layer_set_text_color(text_layer8, GColorWhite);
-  text_layer_set_font(text_layer8, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
-  memset(line_8_buf, 0, BUFFER_SIZE);
-  snprintf(line_8_buf, BUFFER_SIZE, "Mar 24");
-  //snprintf(line_8_buf, BUFFER_SIZE, "Dec 24");
-  text_layer_set_text(text_layer8, line_8_buf);
-  text_layer_set_text_alignment(text_layer8, GTextAlignmentRight);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer8));
+  date_layer = text_layer_create((GRect) { .origin = { 90, 0+24+24+24+24+38+5}, .size = { 144-90-5, 24} });
+  text_layer_set_background_color(date_layer, GColorBlack);
+  text_layer_set_text_color(date_layer, GColorWhite);
+  text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+  memset(date_buf, 0, BUFFER_SIZE);
+  snprintf(date_buf, BUFFER_SIZE, "Mar 24");
+  //snprintf(date_buf, BUFFER_SIZE, "Dec 24");
+  text_layer_set_text(date_layer, date_buf);
+  text_layer_set_text_alignment(date_layer, GTextAlignmentRight);
+  layer_add_child(window_layer, text_layer_get_layer(date_layer));
   
   layer_mark_dirty(window_get_root_layer(window));
 }
@@ -173,23 +186,30 @@ static void window_unload(Window *window) {
   text_layer_destroy(text_layer3);
   text_layer_destroy(text_layer4);
   text_layer_destroy(text_layer5);
-  text_layer_destroy(text_layer7);
-  text_layer_destroy(text_layer8);
+  text_layer_destroy(time_layer);
+  text_layer_destroy(date_layer);
 }
 
-static void setup_time_callback(void* data) {
-  char* tmp = malloc(BUFFER_SIZE * sizeof(char));
-  memset(tmp, 0, BUFFER_SIZE);
-  strcpy(tmp, line_7_buf);  
+static void setup_time_and_date_callback(void* data) {
+  char* previous_time_buf = malloc(BUFFER_SIZE * sizeof(char));
+  memset(previous_time_buf, 0, BUFFER_SIZE);
+  strcpy(previous_time_buf, time_buf);  
+
+  char* previous_date_buf = malloc(BUFFER_SIZE * sizeof(char));
+  memset(previous_date_buf, 0, BUFFER_SIZE);
+  strcpy(previous_date_buf, date_buf);
 
   setup_time_buf();
+  setup_date_buf();
 
   //if the time changed, refresh the window
-  if(! strcmp(tmp, line_7_buf)) { 
+  if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
     layer_mark_dirty(window_get_root_layer(window));
   }
-  free(tmp);
-  app_timer_register(1000, setup_time_callback, (void*) 0);
+  free(previous_time_buf);
+  free(previous_date_buf);
+
+  app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 }
 
 static void init(void) {
@@ -199,10 +219,10 @@ static void init(void) {
   line_4_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_5_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_6_buf = malloc(BUFFER_SIZE * sizeof(char));
-  line_7_buf = malloc(BUFFER_SIZE * sizeof(char));
-  line_8_buf = malloc(BUFFER_SIZE * sizeof(char));
+  time_buf = malloc(BUFFER_SIZE * sizeof(char));
+  date_buf = malloc(BUFFER_SIZE * sizeof(char));
 
-  app_timer_register(1000, setup_time_callback, (void*) 0);
+  app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 
   window = window_create();
   window_set_window_handlers(window, (WindowHandlers) {
@@ -221,8 +241,8 @@ static void deinit(void) {
   free(line_4_buf);
   free(line_5_buf);
   free(line_6_buf);
-  free(line_7_buf);
-  free(line_8_buf);
+  free(time_buf);
+  free(date_buf);
 }
 
 // ****** the callback functions...
@@ -237,47 +257,50 @@ void out_failed_handler(DictionaryIterator *failed, AppMessageResult reason, voi
   // outgoing message failed
 }
 
-//const uint32_t SOME_DATA_KEY = 0xb00bf00b;
-//const uint32_t SOME_STRING_KEY = 0xabbababe;
+const uint32_t SOME_DATA_KEY = 0xb00bf00b;
+const uint32_t SOME_STRING_KEY = 0xabbababe;
 
 #define SOME_DATA_KEY  0xb00bf00b
 #define SOME_STRING_KEY  0xabbababe
 
 void in_received_handler(DictionaryIterator *received, void *context) {
   // incoming message received
-//int size = (int)received->end - (int)received->dictionary;
+  APP_LOG(APP_LOG_LEVEL_INFO, "in_received_handler called..");
+  int size = (int)received->end - (int)received->dictionary;
 
-Tuple *tuple = dict_read_first(received);
-int i=0;
-int LEN = 25;
-char* str = malloc(LEN*sizeof(char));
+  Tuple *tuple = dict_read_first(received);
+  int i=0;
+  int LEN = 25;
+  char* str = malloc(LEN*sizeof(char));
 
-while (tuple) {
-  switch (tuple->key) {
-    case SOME_DATA_KEY:
-      i++;
-      //snprintf(str, LEN, "received: %d", tuple->value[0].int8);
-      //text_layer_set_text(text_layer, str);
-      break;
-    case SOME_STRING_KEY:
-      i++;
-      APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %s", tuple->value[0].cstring);
-      snprintf(str, LEN, "received: %s", tuple->value[0].cstring);
-      //text_layer_set_text(text_layer, str);
-      break;
+  while (tuple) {
+    switch (tuple->key) {
+      case SOME_DATA_KEY:
+        i++;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %d", tuple->value[0].int8);
+        //snprintf(str, LEN, "received: %d", tuple->value[0].int8);
+        //text_layer_set_text(text_layer, str);
+        break;
+      case SOME_STRING_KEY:
+        i++;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %s", tuple->value[0].cstring);
+        snprintf(str, LEN, "received: %s", tuple->value[0].cstring);
+        //text_layer_set_text(text_layer, str);
+        break;
+    }
+    tuple = dict_read_next(received);
   }
-  tuple = dict_read_next(received);
-}
 
-//snprintf(str, LEN, "read num: %d", i);
-//text_layer_set_text(text_layer, str);
-free(str);
-
+  //snprintf(str, LEN, "read num: %d", i);
+  //text_layer_set_text(text_layer1, str);
+  //layer_mark_dirty(window_get_root_layer(window));
+  free(str);
 
 }
 
 
 void in_dropped_handler(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "App message was dropped!");
   // incoming message dropped
 }
 
@@ -292,6 +315,8 @@ void initCommunication(void) {
   const uint32_t inbound_size = 64;
   const uint32_t outbound_size = 64;
   app_message_open(inbound_size, outbound_size);
+
+  APP_LOG(APP_LOG_LEVEL_INFO, "message handlers registered!");
 }
 
 int main(void) {
