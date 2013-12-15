@@ -1,9 +1,14 @@
 #include <pebble.h>
 
 static Window *window;
-static TextLayer *text_layer;
+static TextLayer *text_layer1;
 static TextLayer *text_layer2;
 static TextLayer *text_layer3;
+static TextLayer *text_layer4;
+static TextLayer *text_layer5;
+static TextLayer *text_layer6;
+static TextLayer *text_layer7;
+static TextLayer *text_layer8;
 static int counter = 0; //notice how this is reset when watch face reloads
 
 #define GLOBAL_COUNTER_STORAGE_KEY 1000
@@ -29,6 +34,11 @@ static int get_global_counter(void) {
 static char* line_1_buf;
 static char* line_2_buf;
 static char* line_3_buf;
+static char* line_4_buf;
+static char* line_5_buf;
+static char* line_6_buf;
+static char* line_7_buf;
+static char* line_8_buf;
 
 static void setup_time_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
@@ -37,67 +47,145 @@ static void setup_time_buf(void) {
   char* tmp = malloc(BUFFER_SIZE * sizeof(char));
   memset(tmp, 0, BUFFER_SIZE);
   strftime(tmp, BUFFER_SIZE, "%I:%M", tm);
-  memset(line_3_buf, 0, BUFFER_SIZE);
+  memset(line_7_buf, 0, BUFFER_SIZE);
   if(tmp[0] == '0') {
     //remove leading zero
-    strncpy(line_3_buf, (char*) &tmp[1], BUFFER_SIZE-1);
+    strncpy(line_7_buf, (char*) &tmp[1], BUFFER_SIZE-1);
   } else {
-    strcpy(line_3_buf, tmp);
+    strcpy(line_7_buf, tmp);
   }
   free(tmp);
   free(clock);
 }
 
+static void update_layer_callback(Layer *layer, GContext* ctx) {
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_draw_line(ctx, (GPoint) { 0, 0 }, (GPoint) { 144,0 });
+}
+
 static void window_load(Window *window) {
+  window_set_background_color(window, GColorBlack); //flip background
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
   //set first line of text
-  text_layer = text_layer_create((GRect) { .origin = { 0, 72 }, .size = { bounds.size.w, 20 } });
-  
+  text_layer1 = text_layer_create((GRect) { .origin = { 0, 0 }, .size = { bounds.size.w, 24 } });
+  text_layer_set_font(text_layer1, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+  text_layer_set_background_color(text_layer1, GColorBlack);
+  text_layer_set_text_color(text_layer1, GColorWhite);
   memset(line_1_buf, 0, BUFFER_SIZE);
-  snprintf(line_1_buf, BUFFER_SIZE, "Count: %d: %d", counter, get_global_counter());
-  counter++;
-
-  text_layer_set_text(text_layer, line_1_buf);
-  text_layer_set_text_alignment(text_layer, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer));
+  snprintf(line_1_buf, BUFFER_SIZE, "Astro Dark");
+  text_layer_set_text(text_layer1, line_1_buf);
+  text_layer_set_text_alignment(text_layer1, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer1));
 
   //set second line of text
-  text_layer2 = text_layer_create((GRect) { .origin = { 0, 72+20}, .size = { bounds.size.w, 20} });
-
+  text_layer2 = text_layer_create((GRect) { .origin = { 0, 0+24}, .size = { bounds.size.w, 24} });
+  text_layer_set_font(text_layer2, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+  text_layer_set_background_color(text_layer2, GColorBlack);
+  text_layer_set_text_color(text_layer2, GColorWhite);
   memset(line_2_buf, 0, BUFFER_SIZE);
-  snprintf(line_2_buf, BUFFER_SIZE, "Second line...");
-
+  snprintf(line_2_buf, BUFFER_SIZE, "-8hr 41min");
   text_layer_set_text(text_layer2, line_2_buf);
   text_layer_set_text_alignment(text_layer2, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer2));
 
   //set third line of text
-  text_layer3 = text_layer_create((GRect) { .origin = { 0, 72+20+20}, .size = { bounds.size.w, 46} });
+  text_layer3 = text_layer_create((GRect) { .origin = { 0, 0+24+24}, .size = { bounds.size.w, 24} });
+  text_layer_set_font(text_layer3, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+  text_layer_set_text_color(text_layer3, GColorWhite);
+  text_layer_set_background_color(text_layer3, GColorBlack);
+  memset(line_3_buf, 0, BUFFER_SIZE);
+  snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
+  text_layer_set_text(text_layer3, line_3_buf);
+  text_layer_set_text_alignment(text_layer3, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer3));
+
+  //set fourth line of text
+  text_layer4 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24}, .size = { bounds.size.w, 24} });
+  text_layer_set_font(text_layer4, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+  text_layer_set_background_color(text_layer4, GColorBlack);
+  text_layer_set_text_color(text_layer4, GColorWhite);
+  memset(line_4_buf, 0, BUFFER_SIZE);
+  snprintf(line_4_buf, BUFFER_SIZE, "-7hr 41min");
+  text_layer_set_text(text_layer4, line_4_buf);
+  text_layer_set_text_alignment(text_layer4, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer4));
+
+  //setup creation of lines
+  Layer *line_layer = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
+  layer_set_update_proc(line_layer, update_layer_callback);
+  layer_add_child(window_layer, line_layer);
+
+  //set 5th line of text
+  text_layer5 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30}, .size = { bounds.size.w, 20} });
+  text_layer_set_font(text_layer5, fonts_get_system_font("RESOURCE_ID_GOTHIC_14"));
+  text_layer_set_background_color(text_layer5, GColorBlack);
+  text_layer_set_text_color(text_layer5, GColorWhite);
+  memset(line_5_buf, 0, BUFFER_SIZE);
+  snprintf(line_5_buf, BUFFER_SIZE, "Moon Set: 4:02am Today");
+  text_layer_set_text(text_layer5, line_5_buf);
+  text_layer_set_text_alignment(text_layer5, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer5));
+
+  //set 6th line of text
+  text_layer6 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30+16}, .size = { bounds.size.w, 20} });
+  text_layer_set_font(text_layer6, fonts_get_system_font("RESOURCE_ID_GOTHIC_14"));
+  text_layer_set_background_color(text_layer6, GColorBlack);
+  text_layer_set_text_color(text_layer6, GColorWhite);
+  memset(line_6_buf, 0, BUFFER_SIZE);
+  snprintf(line_6_buf, BUFFER_SIZE, "Moon Rise: 3:25p Tom.");
+  text_layer_set_text(text_layer6, line_6_buf);
+  text_layer_set_text_alignment(text_layer6, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer6));
+
+  //set 7th line of text
+  text_layer7 = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
+  text_layer_set_background_color(text_layer7, GColorBlack);
+  text_layer_set_text_color(text_layer7, GColorWhite);
 
   setup_time_buf();
 
-  text_layer_set_text(text_layer3, line_3_buf);
-  text_layer_set_font(text_layer3, fonts_get_system_font("RESOURCE_ID_BITHAM_42_BOLD"));
-  text_layer_set_text_alignment(text_layer3, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer3));
+  //text_layer_set_text(text_layer7, "12:44"); //widest?
+  text_layer_set_text(text_layer7, line_7_buf);
+  text_layer_set_font(text_layer7, fonts_get_system_font("RESOURCE_ID_BITHAM_30_BLACK"));
+  text_layer_set_text_alignment(text_layer7, GTextAlignmentLeft);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer7));
+
+  //set 8th line of text
+  text_layer8 = text_layer_create((GRect) { .origin = { 90, 0+24+24+24+24+38+5}, .size = { 144-90-5, 24} });
+  text_layer_set_background_color(text_layer8, GColorBlack);
+  text_layer_set_text_color(text_layer8, GColorWhite);
+  text_layer_set_font(text_layer8, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+  memset(line_8_buf, 0, BUFFER_SIZE);
+  snprintf(line_8_buf, BUFFER_SIZE, "Mar 24");
+  //snprintf(line_8_buf, BUFFER_SIZE, "Dec 24");
+  text_layer_set_text(text_layer8, line_8_buf);
+  text_layer_set_text_alignment(text_layer8, GTextAlignmentRight);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer8));
   
+  layer_mark_dirty(window_get_root_layer(window));
 }
 
 static void window_unload(Window *window) {
-  text_layer_destroy(text_layer);
+  text_layer_destroy(text_layer1);
+  text_layer_destroy(text_layer2);
+  text_layer_destroy(text_layer3);
+  text_layer_destroy(text_layer4);
+  text_layer_destroy(text_layer5);
+  text_layer_destroy(text_layer7);
+  text_layer_destroy(text_layer8);
 }
 
 static void setup_time_callback(void* data) {
   char* tmp = malloc(BUFFER_SIZE * sizeof(char));
   memset(tmp, 0, BUFFER_SIZE);
-  strcpy(tmp, line_3_buf);  
+  strcpy(tmp, line_7_buf);  
 
   setup_time_buf();
 
   //if the time changed, refresh the window
-  if(! strcmp(tmp, line_3_buf)) { 
+  if(! strcmp(tmp, line_7_buf)) { 
     layer_mark_dirty(window_get_root_layer(window));
   }
   free(tmp);
@@ -108,6 +196,11 @@ static void init(void) {
   line_1_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_2_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_3_buf = malloc(BUFFER_SIZE * sizeof(char));
+  line_4_buf = malloc(BUFFER_SIZE * sizeof(char));
+  line_5_buf = malloc(BUFFER_SIZE * sizeof(char));
+  line_6_buf = malloc(BUFFER_SIZE * sizeof(char));
+  line_7_buf = malloc(BUFFER_SIZE * sizeof(char));
+  line_8_buf = malloc(BUFFER_SIZE * sizeof(char));
 
   app_timer_register(1000, setup_time_callback, (void*) 0);
 
@@ -125,6 +218,11 @@ static void deinit(void) {
   free(line_1_buf);
   free(line_2_buf);
   free(line_3_buf);
+  free(line_4_buf);
+  free(line_5_buf);
+  free(line_6_buf);
+  free(line_7_buf);
+  free(line_8_buf);
 }
 
 // ****** the callback functions...
@@ -165,7 +263,7 @@ while (tuple) {
       i++;
       APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %s", tuple->value[0].cstring);
       snprintf(str, LEN, "received: %s", tuple->value[0].cstring);
-      text_layer_set_text(text_layer, str);
+      //text_layer_set_text(text_layer, str);
       break;
   }
   tuple = dict_read_next(received);
