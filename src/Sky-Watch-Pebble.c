@@ -13,21 +13,21 @@ static TextLayer *date_layer;
 #define GLOBAL_COUNTER_STORAGE_KEY 1000
 
 
-static int get_global_counter(void) {
-
-  bool entry_exists = persist_read_bool(GLOBAL_COUNTER_STORAGE_KEY);
-  int32_t global_counter = 0;
-  if(entry_exists) {
-    global_counter = persist_read_int(GLOBAL_COUNTER_STORAGE_KEY);
-  } 
-
-  global_counter++;
-
-  persist_write_int(GLOBAL_COUNTER_STORAGE_KEY, global_counter);
-
-  return global_counter;
-
-}
+//static int get_global_counter(void) {
+//
+//  bool entry_exists = persist_read_bool(GLOBAL_COUNTER_STORAGE_KEY);
+//  int32_t global_counter = 0;
+//  if(entry_exists) {
+//    global_counter = persist_read_int(GLOBAL_COUNTER_STORAGE_KEY);
+//  } 
+//
+//  global_counter++;
+//
+//  persist_write_int(GLOBAL_COUNTER_STORAGE_KEY, global_counter);
+//
+//  return global_counter;
+//
+//}
 
 
 #define BUFFER_SIZE 25
@@ -247,54 +247,63 @@ static void deinit(void) {
 
 // ****** the callback functions...
 
+/**
+ The time related events, such as the value for SUN_RISE_KEY, are encoded as
+ the minute of the day 0 to 1,4440. e.g. 0 = 12:00am and 14439 = 11:59pm
+ 
+ The watch and iPhone share the same timezone at the time of synchronization.
+ */
+#define DAY_SLOT_KEY                     1000 // 8bit int
+#define DAY_OF_YEAR_KEY                  1001 //16bit int
+#define YEAR_KEY                         1002 //16bit int
+#define SUN_RISE_KEY                     1003 //16bit int
+#define SUN_RISE_AZIMUTH_KEY             1004 //16bit int
+#define SUN_SET_KEY                      1005 //16bit int
+#define SUN_SET_AZIMUTH_KEY              1006 //16bit int
+#define SOLAR_NOON                       1007 //16bit int
+#define SOLAR_MIDNIGHT                   1008 //16bit int
+#define GOLDEN_HOUR_BEGIN_KEY            1009 //16bit int
+#define GOLDEN_HOUR_END_KEY              1010 //16bit int
+#define CIVIL_TWILIGHT_BEGIN_KEY         1011 //16bit int
+#define CIVIL_TWILIGHT_END_KEY           1012 //16bit int
+#define NAUTICAL_TWILIGHT_BEGIN_KEY      1013 //16bit int
+#define NAUTICAL_TWILIGHT_END_KEY        1014 //16bit int
+#define ASTRONOMICAL_TWILIGHT_BEGIN_KEY  1015 //16bit int
+#define ASTRONOMICAL_TWILIGHT_END_KEY    1016 //16bit int
+#define MOON_RISE_KEY                    1017 //16bit int
+#define MOON_RISE_AZIMUTH_KEY            1018 //16bit int
+#define MOON_SET_KEY                     1019 //16bit int
+#define MOON_SET_AZIMUTH_KEY             1020 //16bit int
+#define MOON_AGE_KEY                     1021 // 8bit int
+#define MOON_PERCENT_ILLUMINATION        1022 // 8bit int
 
-void out_sent_handler(DictionaryIterator *sent, void *context) {
-  // outgoing message was delivered
-}
 
-
-void out_failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
-  // outgoing message failed
-}
-
-const uint32_t SOME_DATA_KEY = 0xb00bf00b;
-const uint32_t SOME_STRING_KEY = 0xabbababe;
-
-#define SOME_DATA_KEY  0xb00bf00b
-#define SOME_STRING_KEY  0xabbababe
 
 void in_received_handler(DictionaryIterator *received, void *context) {
   // incoming message received
   APP_LOG(APP_LOG_LEVEL_INFO, "in_received_handler called..");
   int size = (int)received->end - (int)received->dictionary;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Size of incoming dictionary: %d", size);
+  
 
   Tuple *tuple = dict_read_first(received);
   int i=0;
-  int LEN = 25;
-  char* str = malloc(LEN*sizeof(char));
 
   while (tuple) {
     switch (tuple->key) {
-      case SOME_DATA_KEY:
+      case DAY_SLOT_KEY:
         i++;
         APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %d", tuple->value[0].int8);
-        //snprintf(str, LEN, "received: %d", tuple->value[0].int8);
-        //text_layer_set_text(text_layer, str);
         break;
-      case SOME_STRING_KEY:
+      case DAY_OF_YEAR_KEY:
         i++;
-        APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %s", tuple->value[0].cstring);
-        snprintf(str, LEN, "received: %s", tuple->value[0].cstring);
-        //text_layer_set_text(text_layer, str);
+        APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %d", tuple->value[0].int16);
         break;
     }
     tuple = dict_read_next(received);
   }
 
-  //snprintf(str, LEN, "read num: %d", i);
-  //text_layer_set_text(text_layer1, str);
-  //layer_mark_dirty(window_get_root_layer(window));
-  free(str);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "i: %d", i);
 
 }
 
@@ -309,11 +318,9 @@ void in_dropped_handler(AppMessageResult reason, void *context) {
 void initCommunication(void) {
   app_message_register_inbox_received(in_received_handler);
   app_message_register_inbox_dropped(in_dropped_handler);
-  app_message_register_outbox_sent(out_sent_handler);
-  app_message_register_outbox_failed(out_failed_handler);
 
-  const uint32_t inbound_size = 64;
-  const uint32_t outbound_size = 64;
+  const uint32_t inbound_size = 124;
+  const uint32_t outbound_size = 124;
   app_message_open(inbound_size, outbound_size);
 
   APP_LOG(APP_LOG_LEVEL_INFO, "message handlers registered!");
