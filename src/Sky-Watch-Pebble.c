@@ -10,24 +10,6 @@ static TextLayer *text_layer6;
 static TextLayer *time_layer;
 static TextLayer *date_layer;
 
-#define GLOBAL_COUNTER_STORAGE_KEY 1000
-
-
-static int get_global_counter(void) {
-
-  bool entry_exists = persist_read_bool(GLOBAL_COUNTER_STORAGE_KEY);
-  int32_t global_counter = 0;
-  if(entry_exists) {
-    global_counter = persist_read_int(GLOBAL_COUNTER_STORAGE_KEY);
-  } 
-
-  global_counter++;
-
-  persist_write_int(GLOBAL_COUNTER_STORAGE_KEY, global_counter);
-
-  return global_counter;
-
-}
 
 
 #define BUFFER_SIZE 25
@@ -247,56 +229,247 @@ static void deinit(void) {
 
 // ****** the callback functions...
 
+/**
+ The time related events, such as the value for SUN_RISE_KEY, are encoded as
+ the minute of the day 0 to 1,4440. e.g. 0 = 12:00am and 14439 = 11:59pm
+ 
+ The watch and iPhone share the same timezone at the time of synchronization.
+ */
+#define CHUNK_KEY                         500 // 8bit int
+#define DAY_SLOT_KEY                     1000 // 8bit int
 
-void out_sent_handler(DictionaryIterator *sent, void *context) {
-  // outgoing message was delivered
+/** Chunk 1 **/
+#define DAY_OF_YEAR_KEY                  1001 //16bit int
+#define YEAR_KEY                         1002 //16bit int
+#define SUN_RISE_KEY                     1003 //16bit int
+#define SUN_RISE_AZIMUTH_KEY             1004 //16bit int
+#define SUN_SET_KEY                      1005 //16bit int
+#define SUN_SET_AZIMUTH_KEY              1006 //16bit int
+#define SOLAR_NOON_KEY                   1007 //16bit int
+#define SOLAR_MIDNIGHT_KEY               1008 //16bit int
+
+/** Chunk 2 **/
+#define GOLDEN_HOUR_BEGIN_KEY            1009 //16bit int
+#define GOLDEN_HOUR_END_KEY              1010 //16bit int
+#define CIVIL_TWILIGHT_BEGIN_KEY         1011 //16bit int
+#define CIVIL_TWILIGHT_END_KEY           1012 //16bit int
+#define NAUTICAL_TWILIGHT_BEGIN_KEY      1013 //16bit int
+#define NAUTICAL_TWILIGHT_END_KEY        1014 //16bit int
+
+/** Chunk 3 **/
+#define ASTRONOMICAL_TWILIGHT_BEGIN_KEY  1015 //16bit int
+#define ASTRONOMICAL_TWILIGHT_END_KEY    1016 //16bit int
+#define MOON_RISE_KEY                    1017 //16bit int
+#define MOON_RISE_AZIMUTH_KEY            1018 //16bit int
+#define MOON_SET_KEY                     1019 //16bit int
+#define MOON_SET_AZIMUTH_KEY             1020 //16bit int
+#define MOON_AGE_KEY                     1021 // 8bit int
+#define MOON_PERCENT_ILLUMINATION_KEY    1022 // 8bit int
+
+#define CHUNK_VALUE_1   0
+#define CHUNK_VALUE_2   1
+#define CHUNK_VALUE_3   2
+
+typedef struct day_of_data {
+    uint8_t  chunk;
+    uint8_t  day_slot;
+    
+    uint16_t day_of_year;
+    uint16_t year;
+    uint16_t sun_rise;
+    uint16_t sun_rise_azimuth;
+    uint16_t sun_set;
+    uint16_t sun_set_azimuth;
+    uint16_t solar_noon;
+    uint16_t solar_midnight;
+    
+    uint16_t golden_hour_begin;
+    uint16_t golden_hour_end;
+    uint16_t civil_twilight_begin;
+    uint16_t civil_twilight_end;
+    uint16_t nautical_twilight_begin;
+    uint16_t nautical_twilight_end;
+    uint16_t astronomical_twilight_begin;
+    uint16_t astronomical_twilight_end;
+    
+    uint16_t moon_rise;
+    uint16_t moon_rise_azimuth;
+    uint16_t moon_set;
+    uint16_t moon_set_azimuth;
+    uint8_t  moon_age;
+    uint8_t  moon_percent_illumination;
+} DATA;
+
+typedef struct time {
+    uint8_t hour;
+    uint8_t min;
+} TIME;
+
+
+void intToTime(int t, TIME *time) {
+    time->hour = t/60;
+    time->min  = t % 60;
+}
+
+char* intToChar(int t, char *c, int size_of_buf) {
+    memset(c, 0, size_of_buf);
+    TIME *time = malloc(sizeof(TIME));
+    intToTime(t, time);
+    snprintf(c, size_of_buf, "%d:%02d", time->hour, time->min);
+    free(time);
+    
+    return c;
 }
 
 
-void out_failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
-  // outgoing message failed
+void dump_to_log(DATA *data_buf) {
+    int c_size = 10;
+    char *c = malloc(sizeof(char)*c_size);
+    
+    APP_LOG(APP_LOG_LEVEL_INFO, "\n\n **************** ");
+    APP_LOG(APP_LOG_LEVEL_INFO, "data slot: %d", data_buf->day_slot);
+    APP_LOG(APP_LOG_LEVEL_INFO, "day of year: %d", data_buf->day_of_year);
+    APP_LOG(APP_LOG_LEVEL_INFO, "year: %d", data_buf->year);
+    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise: %s", intToChar(data_buf->sun_rise, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise azimuth: %d", data_buf->sun_rise_azimuth);
+    APP_LOG(APP_LOG_LEVEL_INFO, "sun set: %s", intToChar(data_buf->sun_set, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "sun set azimuth: %d", data_buf->sun_set_azimuth);
+    APP_LOG(APP_LOG_LEVEL_INFO, "solar noon: %s", intToChar(data_buf->solar_noon, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "solar midnight: %s", intToChar(data_buf->solar_midnight, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour begin: %s", intToChar(data_buf->golden_hour_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour end: %s", intToChar(data_buf->golden_hour_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight begin: %s", intToChar(data_buf->civil_twilight_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight end: %s", intToChar(data_buf->civil_twilight_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight begin: %s", intToChar(data_buf->nautical_twilight_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight end: %s", intToChar(data_buf->nautical_twilight_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight begin: %s", intToChar(data_buf->astronomical_twilight_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight end: %s", intToChar(data_buf->astronomical_twilight_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise: %s", intToChar(data_buf->moon_rise, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise azimuth: %d", data_buf->moon_rise_azimuth);
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon set: %s", intToChar(data_buf->moon_set, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon set azimuth: %d", data_buf->moon_set_azimuth);
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon age: %d", data_buf->moon_age);
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon percent illumination: %d", data_buf->moon_percent_illumination);
+    
+    free(c);
 }
 
-const uint32_t SOME_DATA_KEY = 0xb00bf00b;
-const uint32_t SOME_STRING_KEY = 0xabbababe;
+/**
+ Max expected slot number is 128 which takes up 8 bits.
+ Day key is 13 in decimal shifted 16 bits to the left.
+ **/
+uint32_t get_data_storage_key(uint8_t slot) {
+    
+    uint32_t k = 13 << 16;
+    k = k | slot;
+    
+    //APP_LOG(APP_LOG_LEVEL_DEBUG, "slot %d to storage_key %d", slot, (int) k);
+    return k;
+    
+}
 
-#define SOME_DATA_KEY  0xb00bf00b
-#define SOME_STRING_KEY  0xabbababe
+static DATA* data_buf;
 
+// incoming message received
 void in_received_handler(DictionaryIterator *received, void *context) {
-  // incoming message received
-  APP_LOG(APP_LOG_LEVEL_INFO, "in_received_handler called..");
-  int size = (int)received->end - (int)received->dictionary;
+    //int size = (int)received->end - (int)received->dictionary;
+    //APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler... Size of incoming dictionary: %d", size);
+    
+    Tuple *tuple = dict_read_first(received);
 
-  Tuple *tuple = dict_read_first(received);
-  int i=0;
-  int LEN = 25;
-  char* str = malloc(LEN*sizeof(char));
-
-  while (tuple) {
-    switch (tuple->key) {
-      case SOME_DATA_KEY:
-        i++;
-        APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %d", tuple->value[0].int8);
-        //snprintf(str, LEN, "received: %d", tuple->value[0].int8);
-        //text_layer_set_text(text_layer, str);
-        break;
-      case SOME_STRING_KEY:
-        i++;
-        APP_LOG(APP_LOG_LEVEL_INFO, "Successfully read! %s", tuple->value[0].cstring);
-        snprintf(str, LEN, "received: %s", tuple->value[0].cstring);
-        //text_layer_set_text(text_layer, str);
-        break;
+    while (tuple) {
+        switch (tuple->key) {
+            case CHUNK_KEY:
+                data_buf->chunk = tuple->value[0].int8;
+                break;
+            case DAY_SLOT_KEY:
+                data_buf->day_slot = tuple->value[0].int8;
+                break;
+            case DAY_OF_YEAR_KEY:
+                data_buf->day_of_year = tuple->value[0].int16;
+                break;
+            case YEAR_KEY:
+                data_buf->year = tuple->value[0].int16;
+                break;
+            case SUN_RISE_KEY:
+                data_buf->sun_rise = tuple->value[0].int16;
+                break;
+            case SUN_RISE_AZIMUTH_KEY:
+                data_buf->sun_rise_azimuth = tuple->value[0].int16;
+                break;
+            case SUN_SET_KEY:
+                data_buf->sun_set = tuple->value[0].int16;
+                break;
+            case SUN_SET_AZIMUTH_KEY:
+                data_buf->sun_set_azimuth = tuple->value[0].int16;
+                break;
+            case SOLAR_NOON_KEY:
+                data_buf->solar_noon = tuple->value[0].int16;
+                break;
+            case SOLAR_MIDNIGHT_KEY:
+                data_buf->solar_midnight = tuple->value[0].int16;
+                break;
+            case GOLDEN_HOUR_BEGIN_KEY:
+                data_buf->golden_hour_begin = tuple->value[0].int16;
+                break;
+            case GOLDEN_HOUR_END_KEY:
+                data_buf->golden_hour_end = tuple->value[0].int16;
+                break;
+            case CIVIL_TWILIGHT_BEGIN_KEY:
+                data_buf->civil_twilight_begin = tuple->value[0].int16;
+                break;
+            case CIVIL_TWILIGHT_END_KEY:
+                data_buf->civil_twilight_end = tuple->value[0].int16;
+                break;
+            case NAUTICAL_TWILIGHT_BEGIN_KEY:
+                data_buf->nautical_twilight_begin = tuple->value[0].int16;
+                break;
+            case NAUTICAL_TWILIGHT_END_KEY:
+                data_buf->nautical_twilight_end = tuple->value[0].int16;
+                break;
+            case ASTRONOMICAL_TWILIGHT_BEGIN_KEY:
+                data_buf->astronomical_twilight_begin = tuple->value[0].int16;
+                break;
+            case ASTRONOMICAL_TWILIGHT_END_KEY:
+                data_buf->astronomical_twilight_end = tuple->value[0].int16;
+                break;
+            case MOON_RISE_KEY:
+                data_buf->moon_rise = tuple->value[0].int16;
+                break;
+            case MOON_RISE_AZIMUTH_KEY:
+                data_buf->moon_rise_azimuth = tuple->value[0].int16;
+                break;
+            case MOON_SET_KEY:
+                data_buf->moon_set = tuple->value[0].int16;
+                break;
+            case MOON_SET_AZIMUTH_KEY:
+                data_buf->moon_set_azimuth = tuple->value[0].int16;
+                break;
+            case MOON_AGE_KEY:
+                data_buf->moon_age = tuple->value[0].int8;
+                break;
+            case MOON_PERCENT_ILLUMINATION_KEY:
+                data_buf->moon_percent_illumination = tuple->value[0].int8;
+                break;
+        }
+        
+        tuple = dict_read_next(received);
     }
-    tuple = dict_read_next(received);
-  }
+    
+    if(data_buf->chunk == CHUNK_VALUE_3) {
+//        dump_to_log(data_buf);
 
-  //snprintf(str, LEN, "read num: %d", i);
-  //text_layer_set_text(text_layer1, str);
-  //layer_mark_dirty(window_get_root_layer(window));
-  free(str);
+        //store the day's worth of data into storage
+        uint32_t key = get_data_storage_key(data_buf->day_slot);
+        persist_write_data (key, data_buf, sizeof(DATA));
+
+        memset(data_buf, 0, sizeof(DATA));
+    }
+
+    free(tuple);
 
 }
+
 
 
 void in_dropped_handler(AppMessageResult reason, void *context) {
@@ -307,13 +480,14 @@ void in_dropped_handler(AppMessageResult reason, void *context) {
 // ****** the callback functions...
 
 void initCommunication(void) {
+  data_buf = malloc(sizeof(DATA));
+  memset(data_buf, 0, sizeof(DATA));
+    
   app_message_register_inbox_received(in_received_handler);
   app_message_register_inbox_dropped(in_dropped_handler);
-  app_message_register_outbox_sent(out_sent_handler);
-  app_message_register_outbox_failed(out_failed_handler);
 
-  const uint32_t inbound_size = 64;
-  const uint32_t outbound_size = 64;
+  const uint32_t inbound_size = 124;
+  const uint32_t outbound_size = 124;
   app_message_open(inbound_size, outbound_size);
 
   APP_LOG(APP_LOG_LEVEL_INFO, "message handlers registered!");
