@@ -70,26 +70,34 @@ uint32_t get_data_storage_key(uint8_t slot) {
 
 //for now assumes that the local time and stored calculations are in the
 //same timezone.
-DATA* locate_data_for_current_date(DATA* in) {
+SEARCH_RESULT* locate_data_for_current_date(SEARCH_RESULT* in) {
   time_t* clock = malloc(sizeof(time_t));
   time(clock); //update clock to current time
   struct tm* tm = localtime(clock);
 
-  DATA *retrieved_data = malloc(sizeof(DATA));
+  DATA *retrieved_today = malloc(sizeof(DATA));
+  DATA *retrieved_tomorrow = malloc(sizeof(DATA));
 
-  DATA *found = 0;
-  for(int i=0; i<MAX_DATA_SLOTS; i++) {
-    uint32_t storage_key = get_data_storage_key(i);
+  DATA *found_today = 0;
+  DATA *found_tomorrow = 0;
+  for(int i=0; i<MAX_DATA_SLOTS-1; i++) {
+    uint32_t storage_key_today    = get_data_storage_key(i);
+    uint32_t storage_key_tomorrow = get_data_storage_key(i+1);
 
-    if(persist_exists(storage_key)) {
-      memset(retrieved_data, 0, sizeof(DATA));
-      persist_read_data(storage_key, retrieved_data, sizeof(DATA)); 
+    if(persist_exists(storage_key_today) && persist_exists(storage_key_tomorrow)) {
+      memset(retrieved_today, 0, sizeof(DATA));
+      persist_read_data(storage_key_today, retrieved_today, sizeof(DATA)); 
 
-      if(retrieved_data->year == tm->tm_year+1900 &&
-         retrieved_data->day_of_year == tm->tm_yday+1) {
+      if(retrieved_today->year == tm->tm_year+1900 &&
+         retrieved_today->day_of_year == tm->tm_yday+1) {
 
-        APP_LOG(APP_LOG_LEVEL_INFO, "found matching stored data with day of year: %d", retrieved_data->day_of_year);
-        found = retrieved_data;
+        APP_LOG(APP_LOG_LEVEL_INFO, "found matching stored data with day of year: %d", retrieved_today->day_of_year);
+
+        memset(retrieved_tomorrow, 0, sizeof(DATA));
+        persist_read_data(storage_key_tomorrow, retrieved_tomorrow, sizeof(DATA)); 
+
+        found_today = retrieved_today;
+        found_tomorrow = retrieved_tomorrow;
         break;
       }
 
@@ -97,14 +105,16 @@ DATA* locate_data_for_current_date(DATA* in) {
 
   }
 
-  if(found) {
-    memcpy(in, found, sizeof(DATA));
+  if(found_today) {
+    memcpy(in->today, found_today, sizeof(DATA));
+    memcpy(in->tomorrow, found_tomorrow, sizeof(DATA));
   }
 
-  free(retrieved_data);
+  free(retrieved_today);
+  free(retrieved_tomorrow);
   free(clock);
 
-  if(found) {
+  if(found_today) {
     return in;
   } else {
     return 0;

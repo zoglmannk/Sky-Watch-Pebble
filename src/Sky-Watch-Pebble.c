@@ -45,44 +45,49 @@ typedef struct remaining {
     int  mins;
 } REMAINING;
 
-static void isDay(DATA *based_on, REMAINING* in) {
+static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
     time_t* clock = malloc(sizeof(time_t));
     time(clock); //update clock to current time
     struct tm* tm = localtime(clock);
 
-    int day_begin = 0;
-    int day_end   = 0;
+    int today_day_begin = 0;
+    int today_day_end   = 0;
+    int tomorrow_day_begin = 0;
+    int tomorrow_day_end   = 0;
     
     switch(config->day_countdown) {
         case HORIZON:
-            day_begin = based_on->sun_rise;
-            day_end   = based_on->sun_set;
+            today_day_begin = based_on->today->sun_rise;
+            today_day_end   = based_on->today->sun_set;
+            tomorrow_day_begin = based_on->tomorrow->sun_rise;
             break;
         case CIVIL:
-            day_begin = based_on->civil_twilight_begin;
-            day_end   = based_on->civil_twilight_end;
+            today_day_begin = based_on->today->civil_twilight_begin;
+            today_day_end   = based_on->today->civil_twilight_end;
+            tomorrow_day_begin = based_on->tomorrow->civil_twilight_begin;
             break;
         case NAUTICAL:
-            day_begin = based_on->nautical_twilight_begin;
-            day_end   = based_on->nautical_twilight_end;
+            today_day_begin = based_on->today->nautical_twilight_begin;
+            today_day_end   = based_on->today->nautical_twilight_end;
+            tomorrow_day_begin = based_on->tomorrow->nautical_twilight_begin;
             break;
         case ASTRONOMICAL:
-            day_begin = based_on->astronomical_twilight_begin;
-            day_end   = based_on->astronomical_twilight_end;
-            
+            today_day_begin = based_on->today->astronomical_twilight_begin;
+            today_day_end   = based_on->today->astronomical_twilight_end;
+            tomorrow_day_begin = based_on->tomorrow->astronomical_twilight_begin;
     }
 
     int minute_of_day = 60*tm->tm_hour + tm->tm_min;
     
-    APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon day_begin: %d and day_end: %d", day_begin, day_end);
+    APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
     APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon current_min_of_day: %d ", minute_of_day);
 
-    if(minute_of_day >= day_begin && minute_of_day <  day_end) {
+    if(minute_of_day >= today_day_begin && minute_of_day <  today_day_end) {
         in->is_object_up = true;
-        in->mins = day_end - minute_of_day;
+        in->mins = today_day_end - minute_of_day;
     } else {
         in->is_object_up = false;
-        in->mins = 230; //fix this. we need the next days data
+        in->mins = 24*60 - minute_of_day + tomorrow_day_begin;
     }
     
     free(clock);
@@ -120,16 +125,21 @@ static char* time_buf;
 static char* date_buf;
 
 static void setup_day_countdown_bufs(void) {
-    DATA *workingData = malloc(sizeof(DATA));
-    DATA *current_data = locate_data_for_current_date(workingData);
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
     memset(line_1_buf, 0, BUFFER_SIZE);
-    if(current_data == 0) {
+    if(ret_result == 0) {
         snprintf(line_1_buf, BUFFER_SIZE, "--NO DATA--");
         snprintf(line_2_buf, BUFFER_SIZE, " ");
     } else {
         REMAINING *remaining = malloc(sizeof(REMAINING));
-        isDay(current_data, remaining);
+        isDay(result, remaining);
         
         if(remaining->is_object_up) {
             snprintf(line_1_buf, BUFFER_SIZE, getDayCountdownHeader());
@@ -143,7 +153,9 @@ static void setup_day_countdown_bufs(void) {
 
     }
     
-    free(workingData);
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
 }
 
 static void setup_date_buf(void) {
@@ -315,7 +327,7 @@ static void setup_time_and_date_callback(void* data) {
     
   setup_day_countdown_bufs();
 
-  app_timer_register(30000, setup_time_and_date_callback, (void*) 0);
+  app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 }
 
 static void init(void) {

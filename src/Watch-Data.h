@@ -85,7 +85,12 @@ void dump_to_log(DATA *data_buf);
 
 uint32_t get_data_storage_key(uint8_t slot);
 
+typedef struct search_result {
+  DATA* today;
+  DATA* tomorrow;
+} SEARCH_RESULT;
+
 /**
  @return 0 when not found 
  */
-DATA* locate_data_for_current_date(DATA* in);
+SEARCH_RESULT* locate_data_for_current_date(SEARCH_RESULT* in);
