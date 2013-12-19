@@ -1,4 +1,101 @@
 #include <pebble.h>
+#include "Watch-Data.h"
+
+
+typedef enum {HORIZON, CIVIL, NAUTICAL, ASTRONOMICAL} DAY_COUNT_DOWN;
+
+typedef struct config {
+    DAY_COUNT_DOWN day_countdown;
+} CONFIG;
+
+static CONFIG *config;
+
+static char* getDayCountdownHeader() {
+    switch(config->day_countdown) {
+        case HORIZON:
+            return "Daylight";
+        case CIVIL:
+            return "Civil Light";
+        case NAUTICAL:
+            return "Nautical Light";
+        case ASTRONOMICAL:
+            return "Astro Light";
+    }
+    
+    return 0;
+}
+
+static char* getNightCountdownHeader() {
+    switch(config->day_countdown) {
+        case HORIZON:
+            return "Dark";
+        case CIVIL:
+            return "Civil Dark";
+        case NAUTICAL:
+            return "Nautical Dark";
+        case ASTRONOMICAL:
+            return "Astro Dark";
+    }
+    
+    return 0;
+}
+
+typedef struct remaining {
+    bool is_object_up;
+    int  mins;
+} REMAINING;
+
+static void isDay(DATA *based_on, REMAINING* in) {
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+
+    int day_begin = 0;
+    int day_end   = 0;
+    
+    switch(config->day_countdown) {
+        case HORIZON:
+            day_begin = based_on->sun_rise;
+            day_end   = based_on->sun_set;
+            break;
+        case CIVIL:
+            day_begin = based_on->civil_twilight_begin;
+            day_end   = based_on->civil_twilight_end;
+            break;
+        case NAUTICAL:
+            day_begin = based_on->nautical_twilight_begin;
+            day_end   = based_on->nautical_twilight_end;
+            break;
+        case ASTRONOMICAL:
+            day_begin = based_on->astronomical_twilight_begin;
+            day_end   = based_on->astronomical_twilight_end;
+            
+    }
+
+    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    
+    APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon day_begin: %d and day_end: %d", day_begin, day_end);
+    APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon current_min_of_day: %d ", minute_of_day);
+
+    if(minute_of_day >= day_begin && minute_of_day <  day_end) {
+        in->is_object_up = true;
+        in->mins = day_end - minute_of_day;
+    } else {
+        in->is_object_up = false;
+        in->mins = 230; //fix this. we need the next days data
+    }
+    
+    free(clock);
+}
+
+static void countdown_mins_to_char(int mins, char* buf, int buffer_size) {
+    if(mins < 60) {
+        snprintf(buf, buffer_size, "-%dmin", mins);
+    } else {
+        snprintf(buf, buffer_size, "-%dhr %dmin", (mins/60), (mins%60));
+    }
+}
+
 
 static Window *window;
 static TextLayer *text_layer1;
@@ -21,6 +118,33 @@ static char* line_5_buf;
 static char* line_6_buf;
 static char* time_buf;
 static char* date_buf;
+
+static void setup_day_countdown_bufs(void) {
+    DATA *workingData = malloc(sizeof(DATA));
+    DATA *current_data = locate_data_for_current_date(workingData);
+    
+    memset(line_1_buf, 0, BUFFER_SIZE);
+    if(current_data == 0) {
+        snprintf(line_1_buf, BUFFER_SIZE, "--NO DATA--");
+        snprintf(line_2_buf, BUFFER_SIZE, " ");
+    } else {
+        REMAINING *remaining = malloc(sizeof(REMAINING));
+        isDay(current_data, remaining);
+        
+        if(remaining->is_object_up) {
+            snprintf(line_1_buf, BUFFER_SIZE, getDayCountdownHeader());
+        } else {
+            snprintf(line_1_buf, BUFFER_SIZE, getNightCountdownHeader());
+        }
+        
+        countdown_mins_to_char(remaining->mins, line_2_buf, BUFFER_SIZE);
+        
+        free(remaining);
+
+    }
+    
+    free(workingData);
+}
 
 static void setup_date_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
@@ -68,9 +192,8 @@ static void window_load(Window *window) {
   text_layer_set_font(text_layer1, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
   text_layer_set_background_color(text_layer1, GColorBlack);
   text_layer_set_text_color(text_layer1, GColorWhite);
-  memset(line_1_buf, 0, BUFFER_SIZE);
-  snprintf(line_1_buf, BUFFER_SIZE, "Astro Dark");
   text_layer_set_text(text_layer1, line_1_buf);
+  memset(line_1_buf, 0, BUFFER_SIZE);
   text_layer_set_text_alignment(text_layer1, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer1));
 
@@ -80,7 +203,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer2, GColorBlack);
   text_layer_set_text_color(text_layer2, GColorWhite);
   memset(line_2_buf, 0, BUFFER_SIZE);
-  snprintf(line_2_buf, BUFFER_SIZE, "-8hr 41min");
   text_layer_set_text(text_layer2, line_2_buf);
   text_layer_set_text_alignment(text_layer2, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer2));
@@ -190,11 +312,16 @@ static void setup_time_and_date_callback(void* data) {
   }
   free(previous_time_buf);
   free(previous_date_buf);
+    
+  setup_day_countdown_bufs();
 
-  app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
+  app_timer_register(30000, setup_time_and_date_callback, (void*) 0);
 }
 
 static void init(void) {
+  config = malloc(sizeof(CONFIG));
+  config->day_countdown = ASTRONOMICAL;
+    
   line_1_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_2_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_3_buf = malloc(BUFFER_SIZE * sizeof(char));
@@ -229,144 +356,7 @@ static void deinit(void) {
 
 // ****** the callback functions...
 
-/**
- The time related events, such as the value for SUN_RISE_KEY, are encoded as
- the minute of the day 0 to 1,4440. e.g. 0 = 12:00am and 14439 = 11:59pm
- 
- The watch and iPhone share the same timezone at the time of synchronization.
- */
-#define CHUNK_KEY                         500 // 8bit int
-#define DAY_SLOT_KEY                     1000 // 8bit int
 
-/** Chunk 1 **/
-#define DAY_OF_YEAR_KEY                  1001 //16bit int
-#define YEAR_KEY                         1002 //16bit int
-#define SUN_RISE_KEY                     1003 //16bit int
-#define SUN_RISE_AZIMUTH_KEY             1004 //16bit int
-#define SUN_SET_KEY                      1005 //16bit int
-#define SUN_SET_AZIMUTH_KEY              1006 //16bit int
-#define SOLAR_NOON_KEY                   1007 //16bit int
-#define SOLAR_MIDNIGHT_KEY               1008 //16bit int
-
-/** Chunk 2 **/
-#define GOLDEN_HOUR_BEGIN_KEY            1009 //16bit int
-#define GOLDEN_HOUR_END_KEY              1010 //16bit int
-#define CIVIL_TWILIGHT_BEGIN_KEY         1011 //16bit int
-#define CIVIL_TWILIGHT_END_KEY           1012 //16bit int
-#define NAUTICAL_TWILIGHT_BEGIN_KEY      1013 //16bit int
-#define NAUTICAL_TWILIGHT_END_KEY        1014 //16bit int
-
-/** Chunk 3 **/
-#define ASTRONOMICAL_TWILIGHT_BEGIN_KEY  1015 //16bit int
-#define ASTRONOMICAL_TWILIGHT_END_KEY    1016 //16bit int
-#define MOON_RISE_KEY                    1017 //16bit int
-#define MOON_RISE_AZIMUTH_KEY            1018 //16bit int
-#define MOON_SET_KEY                     1019 //16bit int
-#define MOON_SET_AZIMUTH_KEY             1020 //16bit int
-#define MOON_AGE_KEY                     1021 // 8bit int
-#define MOON_PERCENT_ILLUMINATION_KEY    1022 // 8bit int
-
-#define CHUNK_VALUE_1   0
-#define CHUNK_VALUE_2   1
-#define CHUNK_VALUE_3   2
-
-typedef struct day_of_data {
-    uint8_t  chunk;
-    uint8_t  day_slot;
-    
-    uint16_t day_of_year;
-    uint16_t year;
-    uint16_t sun_rise;
-    uint16_t sun_rise_azimuth;
-    uint16_t sun_set;
-    uint16_t sun_set_azimuth;
-    uint16_t solar_noon;
-    uint16_t solar_midnight;
-    
-    uint16_t golden_hour_begin;
-    uint16_t golden_hour_end;
-    uint16_t civil_twilight_begin;
-    uint16_t civil_twilight_end;
-    uint16_t nautical_twilight_begin;
-    uint16_t nautical_twilight_end;
-    uint16_t astronomical_twilight_begin;
-    uint16_t astronomical_twilight_end;
-    
-    uint16_t moon_rise;
-    uint16_t moon_rise_azimuth;
-    uint16_t moon_set;
-    uint16_t moon_set_azimuth;
-    uint8_t  moon_age;
-    uint8_t  moon_percent_illumination;
-} DATA;
-
-typedef struct time {
-    uint8_t hour;
-    uint8_t min;
-} TIME;
-
-
-void intToTime(int t, TIME *time) {
-    time->hour = t/60;
-    time->min  = t % 60;
-}
-
-char* intToChar(int t, char *c, int size_of_buf) {
-    memset(c, 0, size_of_buf);
-    TIME *time = malloc(sizeof(TIME));
-    intToTime(t, time);
-    snprintf(c, size_of_buf, "%d:%02d", time->hour, time->min);
-    free(time);
-    
-    return c;
-}
-
-
-void dump_to_log(DATA *data_buf) {
-    int c_size = 10;
-    char *c = malloc(sizeof(char)*c_size);
-    
-    APP_LOG(APP_LOG_LEVEL_INFO, "\n\n **************** ");
-    APP_LOG(APP_LOG_LEVEL_INFO, "data slot: %d", data_buf->day_slot);
-    APP_LOG(APP_LOG_LEVEL_INFO, "day of year: %d", data_buf->day_of_year);
-    APP_LOG(APP_LOG_LEVEL_INFO, "year: %d", data_buf->year);
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise: %s", intToChar(data_buf->sun_rise, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise azimuth: %d", data_buf->sun_rise_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun set: %s", intToChar(data_buf->sun_set, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun set azimuth: %d", data_buf->sun_set_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "solar noon: %s", intToChar(data_buf->solar_noon, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "solar midnight: %s", intToChar(data_buf->solar_midnight, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour begin: %s", intToChar(data_buf->golden_hour_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour end: %s", intToChar(data_buf->golden_hour_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight begin: %s", intToChar(data_buf->civil_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight end: %s", intToChar(data_buf->civil_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight begin: %s", intToChar(data_buf->nautical_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight end: %s", intToChar(data_buf->nautical_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight begin: %s", intToChar(data_buf->astronomical_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight end: %s", intToChar(data_buf->astronomical_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise: %s", intToChar(data_buf->moon_rise, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise azimuth: %d", data_buf->moon_rise_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon set: %s", intToChar(data_buf->moon_set, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon set azimuth: %d", data_buf->moon_set_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon age: %d", data_buf->moon_age);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon percent illumination: %d", data_buf->moon_percent_illumination);
-    
-    free(c);
-}
-
-/**
- Max expected slot number is 128 which takes up 8 bits.
- Day key is 13 in decimal shifted 16 bits to the left.
- **/
-uint32_t get_data_storage_key(uint8_t slot) {
-    
-    uint32_t k = 13 << 16;
-    k = k | slot;
-    
-    //APP_LOG(APP_LOG_LEVEL_DEBUG, "slot %d to storage_key %d", slot, (int) k);
-    return k;
-    
-}
 
 static DATA* data_buf;
 
