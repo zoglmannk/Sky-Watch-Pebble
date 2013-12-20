@@ -384,8 +384,8 @@ static void setup_moon_tiny_bufs(void) {
         snprintf(line_5_buf, BUFFER_SIZE, "Please run Sky Watch");
         snprintf(line_6_buf, BUFFER_SIZE, "iPhone app and push data.");
     } else {
-        EVENT (*events)[2] = malloc(sizeof(EVENT)*3);
-        memset(events, 0, sizeof(EVENT)*3); // WHY is each index of the array indexing with 16 bytes when an event is only 8 bytes!?!?
+        EVENT (*events)[2] = malloc(sizeof(EVENT)*2*2); //only need two!! 
+        memset(events, 0, sizeof(EVENT)*2*2); // WHY is each index of the array indexing with 16 bytes when an event is only 8 bytes!?!?
         next_two_moon_events(result, events);
         
         //APP_LOG(APP_LOG_LEVEL_INFO, "events[0]->minute_of_day: %d ", events[0]->minute_of_day);
@@ -396,10 +396,12 @@ static void setup_moon_tiny_bufs(void) {
         //APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(uint16_t): %d sizeof(int) %d", sizeof(uint16_t), sizeof(int));
 
         APP_LOG(APP_LOG_LEVEL_INFO, "events[0] addr: %d   event[1] addr: %d   sizeof(EVENT): %d", (int) &events[0], (int) &events[1], sizeof(EVENT));
-        APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(MY_EVENT): %d   &events[1] - &event[0]: %d", sizeof(MY_EVENT), ((int) &events[1]) - ((int) &events[0]));
+        MY_EVENT (*my_events)[2] = malloc(sizeof(EVENT)*3);
+        APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(MY_EVENT): %d   &my_events[1] - &my_event[0]: %d", sizeof(MY_EVENT), ((int) &my_events[1]) - ((int) &my_events[0]));
         moon_event_to_char(events[0], line_5_buf, BUFFER_SIZE);
         moon_event_to_char(events[1], line_6_buf, BUFFER_SIZE);
         
+        free(my_events);
         free(events);
     }
     
