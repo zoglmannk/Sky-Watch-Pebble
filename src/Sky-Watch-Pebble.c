@@ -53,7 +53,6 @@ static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
     int today_day_begin = 0;
     int today_day_end   = 0;
     int tomorrow_day_begin = 0;
-    int tomorrow_day_end   = 0;
     
     switch(config->day_countdown) {
         case HORIZON:
@@ -90,6 +89,48 @@ static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
         in->mins = 24*60 - minute_of_day + tomorrow_day_begin;
     }
     
+    free(clock);
+}
+
+static void moon_remaining(SEARCH_RESULT *based_on, REMAINING *in) {
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+    
+    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+
+    if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_set) {
+        //upcoming moon set and countdown = set - time
+        in->is_object_up = true;
+        in->mins = based_on->today->moon_set - minute_of_day;
+        
+    } else if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_rise) {
+        //upcoming moon rise and countdown = rise - time
+        in->is_object_up = false;
+        in->mins = based_on->today->moon_rise - minute_of_day;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_rise) {
+        //upcoming moon rise and countdown = rise - time
+        in->is_object_up = false;
+        in->mins = based_on->today->moon_rise - minute_of_day;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_set) {
+        //upcoming moon set and countdown = set - time
+        in->is_object_up = true;
+        in->mins = based_on->today->moon_set - minute_of_day;
+        
+    } else if (based_on->tomorrow->moon_set < based_on->tomorrow->moon_rise) {
+        //upcoming moon set and countdown = 24hr - time + next set
+        in->is_object_up = true;
+        in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_set;
+        
+    } else {
+        //upcoming moon rise and countdown = 24hr - time + next rise
+        in->is_object_up = false;
+        in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_rise;
+        
+    }
+
     free(clock);
 }
 
@@ -133,7 +174,7 @@ static void setup_day_countdown_bufs(void) {
     
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
-    memset(line_1_buf, 0, BUFFER_SIZE);
+
     if(ret_result == 0) {
         snprintf(line_1_buf, BUFFER_SIZE, "--NO DATA--");
         snprintf(line_2_buf, BUFFER_SIZE, " ");
@@ -150,7 +191,39 @@ static void setup_day_countdown_bufs(void) {
         countdown_mins_to_char(remaining->mins, line_2_buf, BUFFER_SIZE);
         
         free(remaining);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+}
 
+static void setup_moon_countdown_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+
+    if(ret_result == 0) {
+        snprintf(line_3_buf, BUFFER_SIZE, "--NO DATA--");
+        snprintf(line_4_buf, BUFFER_SIZE, " ");
+    } else {
+        REMAINING *remaining = malloc(sizeof(REMAINING));
+        moon_remaining(result, remaining);
+        
+        if(remaining->is_object_up) {
+            snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
+        } else {
+            snprintf(line_3_buf, BUFFER_SIZE, "Moon Rise");
+        }
+        
+        countdown_mins_to_char(remaining->mins, line_4_buf, BUFFER_SIZE);
+        
+        free(remaining);
     }
     
     free(today_data);
@@ -225,7 +298,6 @@ static void window_load(Window *window) {
   text_layer_set_text_color(text_layer3, GColorWhite);
   text_layer_set_background_color(text_layer3, GColorBlack);
   memset(line_3_buf, 0, BUFFER_SIZE);
-  snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
   text_layer_set_text(text_layer3, line_3_buf);
   text_layer_set_text_alignment(text_layer3, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer3));
@@ -236,7 +308,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer4, GColorBlack);
   text_layer_set_text_color(text_layer4, GColorWhite);
   memset(line_4_buf, 0, BUFFER_SIZE);
-  snprintf(line_4_buf, BUFFER_SIZE, "-7hr 41min");
   text_layer_set_text(text_layer4, line_4_buf);
   text_layer_set_text_alignment(text_layer4, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer4));
@@ -318,6 +389,11 @@ static void setup_time_and_date_callback(void* data) {
   setup_time_buf();
   setup_date_buf();
 
+    
+  setup_day_countdown_bufs();
+  setup_moon_countdown_bufs();
+  
+    
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
     layer_mark_dirty(window_get_root_layer(window));
@@ -325,8 +401,6 @@ static void setup_time_and_date_callback(void* data) {
   free(previous_time_buf);
   free(previous_date_buf);
     
-  setup_day_countdown_bufs();
-
   app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 }
 
