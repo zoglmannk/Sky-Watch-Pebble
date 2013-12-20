@@ -78,15 +78,15 @@ static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
 
     int minute_of_day = 60*tm->tm_hour + tm->tm_min;
     
-    APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
-    APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon current_min_of_day: %d ", minute_of_day);
+    //APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
+    //APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon current_min_of_day: %d ", minute_of_day);
 
     if(minute_of_day >= today_day_begin && minute_of_day <  today_day_end) {
         in->is_object_up = true;
         in->mins = today_day_end - minute_of_day;
     } else {
         in->is_object_up = false;
-        in->mins = 24*60 - minute_of_day + tomorrow_day_begin;
+        in->mins = tomorrow_day_begin - minute_of_day;
     }
     
     free(clock);
@@ -131,6 +131,99 @@ static void moon_remaining(SEARCH_RESULT *based_on, REMAINING *in) {
         
     }
 
+    free(clock);
+}
+
+typedef struct event {
+    bool is_object_rising;
+    bool is_today;
+    int  minute_of_day;
+} EVENT;
+
+typedef struct my_event {
+    bool is_object_rising;
+    bool is_today;
+    int  minute_of_day;
+} MY_EVENT;
+
+static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[2]) {
+    EVENT *first_event = in[0];
+    EVENT *second_event = in[1];
+    
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+    
+    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    
+    if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_set) {
+        //upcoming today moon set, then today moon rise
+        first_event->is_object_rising = false;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_set;
+        
+        second_event->is_object_rising = true;
+        second_event->is_today = true;
+        second_event->minute_of_day = based_on->today->moon_rise;
+        
+    } else if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_rise) {
+        //upcoming today moon rise, then tomorrow moon set
+        first_event->is_object_rising = true;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_rise;
+        
+        second_event->is_object_rising = false;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_set;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_rise) {
+        //upcoming today moon rise, then today moon set
+        first_event->is_object_rising = true;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_rise;
+        
+        second_event->is_object_rising = false;
+        second_event->is_today = true;
+        second_event->minute_of_day = based_on->today->moon_set;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_set) {
+        //upcoming today moon set, then tomorrow moon rise
+        first_event->is_object_rising = false;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_set;
+        
+        second_event->is_object_rising = true;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_rise;
+        
+    } else if (based_on->tomorrow->moon_set < based_on->tomorrow->moon_rise) {
+        //upcoming tomorrow moon set, then tomorrow moon rise
+        first_event->is_object_rising = false;
+        first_event->is_today = false;
+        first_event->minute_of_day = based_on->tomorrow->moon_set;
+        
+        second_event->is_object_rising = true;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_rise;
+        
+    } else {
+        //upcoming tomorrow moon rise, then tomorrow moon set
+        first_event->is_object_rising = true;
+        first_event->is_today = false;
+        first_event->minute_of_day = based_on->tomorrow->moon_rise;
+        
+        second_event->is_object_rising = false;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_set;
+        
+    }
+    
+//    APP_LOG(APP_LOG_LEVEL_INFO, "based_on->tomorrow->moon_rise: %d ", based_on->tomorrow->moon_rise);
+//    APP_LOG(APP_LOG_LEVEL_INFO, "based_on->tomorrow->moon_set: %d ", based_on->tomorrow->moon_set);
+//    
+//    APP_LOG(APP_LOG_LEVEL_INFO, "first_event->minute_of_day: %d ", first_event->minute_of_day);
+//    APP_LOG(APP_LOG_LEVEL_INFO, "second_event->minute_of_day: %d ", second_event->minute_of_day);
+    
     free(clock);
 }
 
@@ -231,6 +324,90 @@ static void setup_moon_countdown_bufs(void) {
     free(result);
 }
 
+
+static void min_of_day_to_char(int minute_of_day, char* buf, int buffer_size) {
+    memset(buf, 0, buffer_size);
+    
+    int hour = minute_of_day / 60;
+    int min =  minute_of_day % 60;
+    
+    char* am_pm = "a";
+    if(hour > 12) {
+        hour -= 12;
+        am_pm = "p";
+    }
+    
+    //APP_LOG(APP_LOG_LEVEL_INFO, "min_of_day_to_char called with min_of_day: %d am_pm: NA", minute_of_day);
+    
+    snprintf(buf, buffer_size, "%d:%d%s", hour, min, am_pm);
+}
+
+static void moon_event_to_char(EVENT *event, char* buf, int buffer_size) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon_event_to_char .. event->minute_of_day: %d ", event->minute_of_day);
+    
+    char *rise_set =       malloc(sizeof(char)*BUFFER_SIZE);
+    char *time =           malloc(sizeof(char)*BUFFER_SIZE);
+    char *today_tomorrow = malloc(sizeof(char)*BUFFER_SIZE);
+    
+    APP_LOG(APP_LOG_LEVEL_INFO, "12d event addr: %d  contains: %d", (int) &event, (int) event);
+    APP_LOG(APP_LOG_LEVEL_INFO, "13d rise_set addr: %d", (int) rise_set);
+    
+    memset(rise_set, 0, BUFFER_SIZE);
+    memset(time, 0, BUFFER_SIZE);
+    memset(today_tomorrow, 0, BUFFER_SIZE);
+    
+    memcpy(rise_set,(event->is_object_rising ? "rise" : "set"),BUFFER_SIZE);
+    min_of_day_to_char(event->minute_of_day, time, BUFFER_SIZE);
+    memcpy(today_tomorrow,(event->is_today ? "Today" : "Tom."),BUFFER_SIZE);
+    
+    snprintf(buf, buffer_size, "Moon %s %s %s",
+             rise_set,
+             time,
+             today_tomorrow );
+    
+    free(today_tomorrow);
+    free(rise_set);
+    free(time);
+}
+
+static void setup_moon_tiny_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+    
+    if(ret_result == 0) {
+        snprintf(line_5_buf, BUFFER_SIZE, "Please run Sky Watch");
+        snprintf(line_6_buf, BUFFER_SIZE, "iPhone app and push data.");
+    } else {
+        EVENT (*events)[2] = malloc(sizeof(EVENT)*3);
+        memset(events, 0, sizeof(EVENT)*3); // WHY is each index of the array indexing with 16 bytes when an event is only 8 bytes!?!?
+        next_two_moon_events(result, events);
+        
+        //APP_LOG(APP_LOG_LEVEL_INFO, "events[0]->minute_of_day: %d ", events[0]->minute_of_day);
+        //APP_LOG(APP_LOG_LEVEL_INFO, "events[1]->minute_of_day: %d ", events[1]->minute_of_day);
+        
+        //EVENT *second_event = events[1];
+        //APP_LOG(APP_LOG_LEVEL_INFO, "second_event->minute_of_day: %d ", second_event->minute_of_day);
+        //APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(uint16_t): %d sizeof(int) %d", sizeof(uint16_t), sizeof(int));
+
+        APP_LOG(APP_LOG_LEVEL_INFO, "events[0] addr: %d   event[1] addr: %d   sizeof(EVENT): %d", (int) &events[0], (int) &events[1], sizeof(EVENT));
+        APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(MY_EVENT): %d   &events[1] - &event[0]: %d", sizeof(MY_EVENT), ((int) &events[1]) - ((int) &events[0]));
+        moon_event_to_char(events[0], line_5_buf, BUFFER_SIZE);
+        moon_event_to_char(events[1], line_6_buf, BUFFER_SIZE);
+        
+        free(events);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+}
+
 static void setup_date_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
   time(clock); //update clock to current time
@@ -240,6 +417,7 @@ static void setup_date_buf(void) {
 
   free(clock);
 }
+
 
 static void setup_time_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
@@ -323,7 +501,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer5, GColorBlack);
   text_layer_set_text_color(text_layer5, GColorWhite);
   memset(line_5_buf, 0, BUFFER_SIZE);
-  snprintf(line_5_buf, BUFFER_SIZE, "Moon Set: 4:02am Today");
   text_layer_set_text(text_layer5, line_5_buf);
   text_layer_set_text_alignment(text_layer5, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer5));
@@ -334,7 +511,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer6, GColorBlack);
   text_layer_set_text_color(text_layer6, GColorWhite);
   memset(line_6_buf, 0, BUFFER_SIZE);
-  snprintf(line_6_buf, BUFFER_SIZE, "Moon Rise: 3:25p Tom.");
   text_layer_set_text(text_layer6, line_6_buf);
   text_layer_set_text_alignment(text_layer6, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer6));
@@ -392,6 +568,7 @@ static void setup_time_and_date_callback(void* data) {
     
   setup_day_countdown_bufs();
   setup_moon_countdown_bufs();
+  setup_moon_tiny_bufs();
   
     
   //if the time changed, refresh the window

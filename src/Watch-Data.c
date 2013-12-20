@@ -91,7 +91,7 @@ SEARCH_RESULT* locate_data_for_current_date(SEARCH_RESULT* in) {
       if(retrieved_today->year == tm->tm_year+1900 &&
          retrieved_today->day_of_year == tm->tm_yday+1) {
 
-        APP_LOG(APP_LOG_LEVEL_INFO, "found matching stored data with day of year: %d", retrieved_today->day_of_year);
+        //APP_LOG(APP_LOG_LEVEL_INFO, "found matching stored data with day of year: %d", retrieved_today->day_of_year);
 
         memset(retrieved_tomorrow, 0, sizeof(DATA));
         persist_read_data(storage_key_tomorrow, retrieved_tomorrow, sizeof(DATA)); 
