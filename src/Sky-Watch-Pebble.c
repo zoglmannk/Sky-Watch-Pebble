@@ -539,7 +539,6 @@ static void window_load(Window *window) {
   text_layer_set_text_color(date_layer, GColorWhite);
   text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
   memset(date_buf, 0, BUFFER_SIZE);
-  snprintf(date_buf, BUFFER_SIZE, "Mar 24");
   //snprintf(date_buf, BUFFER_SIZE, "Dec 24");
   text_layer_set_text(date_layer, date_buf);
   text_layer_set_text_alignment(date_layer, GTextAlignmentRight);
