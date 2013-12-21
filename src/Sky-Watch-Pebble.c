@@ -215,12 +215,6 @@ static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[1]) {
         
     }
     
-//    APP_LOG(APP_LOG_LEVEL_INFO, "based_on->tomorrow->moon_rise: %d ", based_on->tomorrow->moon_rise);
-//    APP_LOG(APP_LOG_LEVEL_INFO, "based_on->tomorrow->moon_set: %d ", based_on->tomorrow->moon_set);
-//    
-//    APP_LOG(APP_LOG_LEVEL_INFO, "first_event->minute_of_day: %d ", first_event->minute_of_day);
-//    APP_LOG(APP_LOG_LEVEL_INFO, "second_event->minute_of_day: %d ", second_event->minute_of_day);
-    
     free(clock);
 }
 
