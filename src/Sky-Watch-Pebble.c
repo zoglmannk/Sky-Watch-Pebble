@@ -84,9 +84,12 @@ static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
     if(minute_of_day >= today_day_begin && minute_of_day <  today_day_end) {
         in->is_object_up = true;
         in->mins = today_day_end - minute_of_day;
-    } else {
+    } else if (minute_of_day < today_day_begin) {
         in->is_object_up = false;
         in->mins = tomorrow_day_begin - minute_of_day;
+    } else {
+        in->is_object_up = false;
+        in->mins = 24*60 - minute_of_day + tomorrow_day_begin;
     }
     
     free(clock);
