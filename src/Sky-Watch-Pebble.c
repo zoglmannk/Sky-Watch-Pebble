@@ -1,4 +1,231 @@
 #include <pebble.h>
+#include "Watch-Data.h"
+
+
+typedef enum {HORIZON, CIVIL, NAUTICAL, ASTRONOMICAL} DAY_COUNT_DOWN;
+
+typedef struct config {
+    DAY_COUNT_DOWN day_countdown;
+} CONFIG;
+
+static CONFIG *config;
+
+static char* get_day_countdown_header() {
+    switch(config->day_countdown) {
+        case HORIZON:
+            return "Daylight";
+        case CIVIL:
+            return "Civil Light";
+        case NAUTICAL:
+            return "Nautical Light";
+        case ASTRONOMICAL:
+            return "Astro Light";
+    }
+    
+    return 0;
+}
+
+static char* get_night_countdown_header() {
+    switch(config->day_countdown) {
+        case HORIZON:
+            return "Dark";
+        case CIVIL:
+            return "Civil Dark";
+        case NAUTICAL:
+            return "Nautical Dark";
+        case ASTRONOMICAL:
+            return "Astro Dark";
+    }
+    
+    return 0;
+}
+
+typedef struct remaining {
+    bool is_object_up;
+    int  mins;
+} REMAINING;
+
+static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+
+    int today_day_begin = 0;
+    int today_day_end   = 0;
+    int tomorrow_day_begin = 0;
+    
+    switch(config->day_countdown) {
+        case HORIZON:
+            today_day_begin = based_on->today->sun_rise;
+            today_day_end   = based_on->today->sun_set;
+            tomorrow_day_begin = based_on->tomorrow->sun_rise;
+            break;
+        case CIVIL:
+            today_day_begin = based_on->today->civil_twilight_begin;
+            today_day_end   = based_on->today->civil_twilight_end;
+            tomorrow_day_begin = based_on->tomorrow->civil_twilight_begin;
+            break;
+        case NAUTICAL:
+            today_day_begin = based_on->today->nautical_twilight_begin;
+            today_day_end   = based_on->today->nautical_twilight_end;
+            tomorrow_day_begin = based_on->tomorrow->nautical_twilight_begin;
+            break;
+        case ASTRONOMICAL:
+            today_day_begin = based_on->today->astronomical_twilight_begin;
+            today_day_end   = based_on->today->astronomical_twilight_end;
+            tomorrow_day_begin = based_on->tomorrow->astronomical_twilight_begin;
+    }
+
+    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    
+    //APP_LOG(APP_LOG_LEVEL_INFO, "is_day basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
+    //APP_LOG(APP_LOG_LEVEL_INFO, "is_day basedon current_min_of_day: %d ", minute_of_day);
+
+    if(minute_of_day >= today_day_begin && minute_of_day <  today_day_end) {
+        in->is_object_up = true;
+        in->mins = today_day_end - minute_of_day;
+    } else if (minute_of_day < today_day_begin) {
+        in->is_object_up = false;
+        in->mins = tomorrow_day_begin - minute_of_day;
+    } else {
+        in->is_object_up = false;
+        in->mins = 24*60 - minute_of_day + tomorrow_day_begin;
+    }
+    
+    free(clock);
+}
+
+static void moon_remaining(SEARCH_RESULT *based_on, REMAINING *in) {
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+    
+    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+
+    if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_set) {
+        //upcoming moon set and countdown = set - time
+        in->is_object_up = true;
+        in->mins = based_on->today->moon_set - minute_of_day;
+        
+    } else if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_rise) {
+        //upcoming moon rise and countdown = rise - time
+        in->is_object_up = false;
+        in->mins = based_on->today->moon_rise - minute_of_day;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_rise) {
+        //upcoming moon rise and countdown = rise - time
+        in->is_object_up = false;
+        in->mins = based_on->today->moon_rise - minute_of_day;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_set) {
+        //upcoming moon set and countdown = set - time
+        in->is_object_up = true;
+        in->mins = based_on->today->moon_set - minute_of_day;
+        
+    } else if (based_on->tomorrow->moon_set < based_on->tomorrow->moon_rise) {
+        //upcoming moon set and countdown = 24hr - time + next set
+        in->is_object_up = true;
+        in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_set;
+        
+    } else {
+        //upcoming moon rise and countdown = 24hr - time + next rise
+        in->is_object_up = false;
+        in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_rise;
+        
+    }
+
+    free(clock);
+}
+
+typedef struct event {
+    bool is_object_rising;
+    bool is_today;
+    int  minute_of_day;
+} EVENT;
+
+static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[1]) {
+    EVENT *first_event = in[0];
+    EVENT *second_event = in[1];
+    
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+    
+    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    
+    if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_set) {
+        //upcoming today moon set, then today moon rise
+        first_event->is_object_rising = false;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_set;
+        
+        second_event->is_object_rising = true;
+        second_event->is_today = true;
+        second_event->minute_of_day = based_on->today->moon_rise;
+        
+    } else if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_rise) {
+        //upcoming today moon rise, then tomorrow moon set
+        first_event->is_object_rising = true;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_rise;
+        
+        second_event->is_object_rising = false;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_set;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_rise) {
+        //upcoming today moon rise, then today moon set
+        first_event->is_object_rising = true;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_rise;
+        
+        second_event->is_object_rising = false;
+        second_event->is_today = true;
+        second_event->minute_of_day = based_on->today->moon_set;
+        
+    } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_set) {
+        //upcoming today moon set, then tomorrow moon rise
+        first_event->is_object_rising = false;
+        first_event->is_today = true;
+        first_event->minute_of_day = based_on->today->moon_set;
+        
+        second_event->is_object_rising = true;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_rise;
+        
+    } else if (based_on->tomorrow->moon_set < based_on->tomorrow->moon_rise) {
+        //upcoming tomorrow moon set, then tomorrow moon rise
+        first_event->is_object_rising = false;
+        first_event->is_today = false;
+        first_event->minute_of_day = based_on->tomorrow->moon_set;
+        
+        second_event->is_object_rising = true;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_rise;
+        
+    } else {
+        //upcoming tomorrow moon rise, then tomorrow moon set
+        first_event->is_object_rising = true;
+        first_event->is_today = false;
+        first_event->minute_of_day = based_on->tomorrow->moon_rise;
+        
+        second_event->is_object_rising = false;
+        second_event->is_today = false;
+        second_event->minute_of_day = based_on->tomorrow->moon_set;
+        
+    }
+    
+    free(clock);
+}
+
+static void countdown_mins_to_char(int mins, char* buf, int buffer_size) {
+    if(mins < 60) {
+        snprintf(buf, buffer_size, "-%dmin", mins);
+    } else {
+        snprintf(buf, buffer_size, "-%dhr %dmin", (mins/60), (mins%60));
+    }
+}
+
 
 static Window *window;
 static TextLayer *text_layer1;
@@ -22,6 +249,142 @@ static char* line_6_buf;
 static char* time_buf;
 static char* date_buf;
 
+static void setup_day_countdown_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+
+    if(ret_result == 0) {
+        snprintf(line_1_buf, BUFFER_SIZE, "--NO DATA--");
+        snprintf(line_2_buf, BUFFER_SIZE, " ");
+    } else {
+        REMAINING *remaining = malloc(sizeof(REMAINING));
+        is_day(result, remaining);
+        
+        if(remaining->is_object_up) {
+            snprintf(line_1_buf, BUFFER_SIZE, get_night_countdown_header());
+        } else {
+            snprintf(line_1_buf, BUFFER_SIZE, get_day_countdown_header());
+        }
+        
+        countdown_mins_to_char(remaining->mins, line_2_buf, BUFFER_SIZE);
+        
+        free(remaining);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+}
+
+static void setup_moon_countdown_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+
+    if(ret_result == 0) {
+        snprintf(line_3_buf, BUFFER_SIZE, "--NO DATA--");
+        snprintf(line_4_buf, BUFFER_SIZE, " ");
+    } else {
+        REMAINING *remaining = malloc(sizeof(REMAINING));
+        moon_remaining(result, remaining);
+        
+        if(remaining->is_object_up) {
+            snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
+        } else {
+            snprintf(line_3_buf, BUFFER_SIZE, "Moon Rise");
+        }
+        
+        countdown_mins_to_char(remaining->mins, line_4_buf, BUFFER_SIZE);
+        
+        free(remaining);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+}
+
+
+static void min_of_day_to_char(int minute_of_day, char* buf, int buffer_size) {
+    memset(buf, 0, buffer_size);
+    
+    int hour = minute_of_day / 60;
+    int min =  minute_of_day % 60;
+    
+    char* am_pm = "a";
+    if(hour > 12) {
+        hour -= 12;
+        am_pm = "p";
+    }
+    
+    //APP_LOG(APP_LOG_LEVEL_INFO, "min_of_day_to_char called with min_of_day: %d am_pm: NA", minute_of_day);
+    
+    snprintf(buf, buffer_size, "%d:%d%s", hour, min, am_pm);
+}
+
+static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
+    char *rise_set =       malloc(sizeof(char)*BUFFER_SIZE);
+    char *time =           malloc(sizeof(char)*BUFFER_SIZE);
+    char *today_tomorrow = malloc(sizeof(char)*BUFFER_SIZE);
+    
+    memset(rise_set, 0, BUFFER_SIZE);
+    memset(time, 0, BUFFER_SIZE);
+    memset(today_tomorrow, 0, BUFFER_SIZE);
+    
+    memcpy(rise_set,(event->is_object_rising ? "rise" : "set"),BUFFER_SIZE);
+    min_of_day_to_char(event->minute_of_day, time, BUFFER_SIZE);
+    memcpy(today_tomorrow,(event->is_today ? "Today" : "Tom."),BUFFER_SIZE);
+    
+    snprintf(buf, buffer_size, "Moon %s %s %s",
+             rise_set,
+             time,
+             today_tomorrow );
+    
+    free(today_tomorrow);
+    free(rise_set);
+    free(time);
+}
+
+static void setup_moon_tiny_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+    
+    if(ret_result == 0) {
+        snprintf(line_5_buf, BUFFER_SIZE, "Please use Sky Watch");
+        snprintf(line_6_buf, BUFFER_SIZE, "iPhone app to push data.");
+    } else {
+        EVENT (*events)[1] = malloc(sizeof(EVENT)*2);
+        memset(events, 0, sizeof(EVENT)*2);
+        next_two_moon_events(result, events);
+        
+        moon_event_to_char(events[0], line_5_buf, BUFFER_SIZE);
+        moon_event_to_char(events[1], line_6_buf, BUFFER_SIZE);
+
+        free(events);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+}
+
 static void setup_date_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
   time(clock); //update clock to current time
@@ -31,6 +394,7 @@ static void setup_date_buf(void) {
 
   free(clock);
 }
+
 
 static void setup_time_buf(void) {
   time_t* clock = malloc(sizeof(time_t));
@@ -47,6 +411,14 @@ static void setup_time_buf(void) {
   } else {
     strcpy(time_buf, tmp);
   }
+
+  //work around font rendering issue when starting with 4 with particular font
+    if(time_buf[0] == '4') {
+      memset(tmp, 0, BUFFER_SIZE);
+      snprintf(tmp, BUFFER_SIZE, " %s", time_buf);
+      memset(time_buf, 0, BUFFER_SIZE);
+      strncpy(time_buf, tmp, BUFFER_SIZE);
+    }
   free(tmp);
   free(clock);
 }
@@ -68,9 +440,8 @@ static void window_load(Window *window) {
   text_layer_set_font(text_layer1, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
   text_layer_set_background_color(text_layer1, GColorBlack);
   text_layer_set_text_color(text_layer1, GColorWhite);
-  memset(line_1_buf, 0, BUFFER_SIZE);
-  snprintf(line_1_buf, BUFFER_SIZE, "Astro Dark");
   text_layer_set_text(text_layer1, line_1_buf);
+  memset(line_1_buf, 0, BUFFER_SIZE);
   text_layer_set_text_alignment(text_layer1, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer1));
 
@@ -80,7 +451,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer2, GColorBlack);
   text_layer_set_text_color(text_layer2, GColorWhite);
   memset(line_2_buf, 0, BUFFER_SIZE);
-  snprintf(line_2_buf, BUFFER_SIZE, "-8hr 41min");
   text_layer_set_text(text_layer2, line_2_buf);
   text_layer_set_text_alignment(text_layer2, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer2));
@@ -91,7 +461,6 @@ static void window_load(Window *window) {
   text_layer_set_text_color(text_layer3, GColorWhite);
   text_layer_set_background_color(text_layer3, GColorBlack);
   memset(line_3_buf, 0, BUFFER_SIZE);
-  snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
   text_layer_set_text(text_layer3, line_3_buf);
   text_layer_set_text_alignment(text_layer3, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer3));
@@ -102,7 +471,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer4, GColorBlack);
   text_layer_set_text_color(text_layer4, GColorWhite);
   memset(line_4_buf, 0, BUFFER_SIZE);
-  snprintf(line_4_buf, BUFFER_SIZE, "-7hr 41min");
   text_layer_set_text(text_layer4, line_4_buf);
   text_layer_set_text_alignment(text_layer4, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer4));
@@ -118,7 +486,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer5, GColorBlack);
   text_layer_set_text_color(text_layer5, GColorWhite);
   memset(line_5_buf, 0, BUFFER_SIZE);
-  snprintf(line_5_buf, BUFFER_SIZE, "Moon Set: 4:02am Today");
   text_layer_set_text(text_layer5, line_5_buf);
   text_layer_set_text_alignment(text_layer5, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer5));
@@ -129,7 +496,6 @@ static void window_load(Window *window) {
   text_layer_set_background_color(text_layer6, GColorBlack);
   text_layer_set_text_color(text_layer6, GColorWhite);
   memset(line_6_buf, 0, BUFFER_SIZE);
-  snprintf(line_6_buf, BUFFER_SIZE, "Moon Rise: 3:25p Tom.");
   text_layer_set_text(text_layer6, line_6_buf);
   text_layer_set_text_alignment(text_layer6, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer6));
@@ -138,12 +504,10 @@ static void window_load(Window *window) {
   time_layer = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
   text_layer_set_background_color(time_layer, GColorBlack);
   text_layer_set_text_color(time_layer, GColorWhite);
-
-  setup_time_buf();
-
-  //text_layer_set_text(time_layer, "12:44"); //widest?
-  text_layer_set_text(time_layer, time_buf);
   text_layer_set_font(time_layer, fonts_get_system_font("RESOURCE_ID_BITHAM_30_BLACK"));
+  setup_time_buf();
+  //text_layer_set_text(time_layer, "4:44"); //problem starting with 4
+  text_layer_set_text(time_layer, time_buf);
   text_layer_set_text_alignment(time_layer, GTextAlignmentLeft);
   layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
@@ -153,8 +517,6 @@ static void window_load(Window *window) {
   text_layer_set_text_color(date_layer, GColorWhite);
   text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
   memset(date_buf, 0, BUFFER_SIZE);
-  snprintf(date_buf, BUFFER_SIZE, "Mar 24");
-  //snprintf(date_buf, BUFFER_SIZE, "Dec 24");
   text_layer_set_text(date_layer, date_buf);
   text_layer_set_text_alignment(date_layer, GTextAlignmentRight);
   layer_add_child(window_layer, text_layer_get_layer(date_layer));
@@ -184,17 +546,26 @@ static void setup_time_and_date_callback(void* data) {
   setup_time_buf();
   setup_date_buf();
 
+    
+  setup_day_countdown_bufs();
+  setup_moon_countdown_bufs();
+  setup_moon_tiny_bufs();
+  
+    
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
     layer_mark_dirty(window_get_root_layer(window));
   }
   free(previous_time_buf);
   free(previous_date_buf);
-
+    
   app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 }
 
 static void init(void) {
+  config = malloc(sizeof(CONFIG));
+  config->day_countdown = ASTRONOMICAL;
+    
   line_1_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_2_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_3_buf = malloc(BUFFER_SIZE * sizeof(char));
@@ -227,146 +598,6 @@ static void deinit(void) {
   free(date_buf);
 }
 
-// ****** the callback functions...
-
-/**
- The time related events, such as the value for SUN_RISE_KEY, are encoded as
- the minute of the day 0 to 1,4440. e.g. 0 = 12:00am and 14439 = 11:59pm
- 
- The watch and iPhone share the same timezone at the time of synchronization.
- */
-#define CHUNK_KEY                         500 // 8bit int
-#define DAY_SLOT_KEY                     1000 // 8bit int
-
-/** Chunk 1 **/
-#define DAY_OF_YEAR_KEY                  1001 //16bit int
-#define YEAR_KEY                         1002 //16bit int
-#define SUN_RISE_KEY                     1003 //16bit int
-#define SUN_RISE_AZIMUTH_KEY             1004 //16bit int
-#define SUN_SET_KEY                      1005 //16bit int
-#define SUN_SET_AZIMUTH_KEY              1006 //16bit int
-#define SOLAR_NOON_KEY                   1007 //16bit int
-#define SOLAR_MIDNIGHT_KEY               1008 //16bit int
-
-/** Chunk 2 **/
-#define GOLDEN_HOUR_BEGIN_KEY            1009 //16bit int
-#define GOLDEN_HOUR_END_KEY              1010 //16bit int
-#define CIVIL_TWILIGHT_BEGIN_KEY         1011 //16bit int
-#define CIVIL_TWILIGHT_END_KEY           1012 //16bit int
-#define NAUTICAL_TWILIGHT_BEGIN_KEY      1013 //16bit int
-#define NAUTICAL_TWILIGHT_END_KEY        1014 //16bit int
-
-/** Chunk 3 **/
-#define ASTRONOMICAL_TWILIGHT_BEGIN_KEY  1015 //16bit int
-#define ASTRONOMICAL_TWILIGHT_END_KEY    1016 //16bit int
-#define MOON_RISE_KEY                    1017 //16bit int
-#define MOON_RISE_AZIMUTH_KEY            1018 //16bit int
-#define MOON_SET_KEY                     1019 //16bit int
-#define MOON_SET_AZIMUTH_KEY             1020 //16bit int
-#define MOON_AGE_KEY                     1021 // 8bit int
-#define MOON_PERCENT_ILLUMINATION_KEY    1022 // 8bit int
-
-#define CHUNK_VALUE_1   0
-#define CHUNK_VALUE_2   1
-#define CHUNK_VALUE_3   2
-
-typedef struct day_of_data {
-    uint8_t  chunk;
-    uint8_t  day_slot;
-    
-    uint16_t day_of_year;
-    uint16_t year;
-    uint16_t sun_rise;
-    uint16_t sun_rise_azimuth;
-    uint16_t sun_set;
-    uint16_t sun_set_azimuth;
-    uint16_t solar_noon;
-    uint16_t solar_midnight;
-    
-    uint16_t golden_hour_begin;
-    uint16_t golden_hour_end;
-    uint16_t civil_twilight_begin;
-    uint16_t civil_twilight_end;
-    uint16_t nautical_twilight_begin;
-    uint16_t nautical_twilight_end;
-    uint16_t astronomical_twilight_begin;
-    uint16_t astronomical_twilight_end;
-    
-    uint16_t moon_rise;
-    uint16_t moon_rise_azimuth;
-    uint16_t moon_set;
-    uint16_t moon_set_azimuth;
-    uint8_t  moon_age;
-    uint8_t  moon_percent_illumination;
-} DATA;
-
-typedef struct time {
-    uint8_t hour;
-    uint8_t min;
-} TIME;
-
-
-void intToTime(int t, TIME *time) {
-    time->hour = t/60;
-    time->min  = t % 60;
-}
-
-char* intToChar(int t, char *c, int size_of_buf) {
-    memset(c, 0, size_of_buf);
-    TIME *time = malloc(sizeof(TIME));
-    intToTime(t, time);
-    snprintf(c, size_of_buf, "%d:%02d", time->hour, time->min);
-    free(time);
-    
-    return c;
-}
-
-
-void dump_to_log(DATA *data_buf) {
-    int c_size = 10;
-    char *c = malloc(sizeof(char)*c_size);
-    
-    APP_LOG(APP_LOG_LEVEL_INFO, "\n\n **************** ");
-    APP_LOG(APP_LOG_LEVEL_INFO, "data slot: %d", data_buf->day_slot);
-    APP_LOG(APP_LOG_LEVEL_INFO, "day of year: %d", data_buf->day_of_year);
-    APP_LOG(APP_LOG_LEVEL_INFO, "year: %d", data_buf->year);
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise: %s", intToChar(data_buf->sun_rise, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise azimuth: %d", data_buf->sun_rise_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun set: %s", intToChar(data_buf->sun_set, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun set azimuth: %d", data_buf->sun_set_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "solar noon: %s", intToChar(data_buf->solar_noon, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "solar midnight: %s", intToChar(data_buf->solar_midnight, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour begin: %s", intToChar(data_buf->golden_hour_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour end: %s", intToChar(data_buf->golden_hour_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight begin: %s", intToChar(data_buf->civil_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight end: %s", intToChar(data_buf->civil_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight begin: %s", intToChar(data_buf->nautical_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight end: %s", intToChar(data_buf->nautical_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight begin: %s", intToChar(data_buf->astronomical_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight end: %s", intToChar(data_buf->astronomical_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise: %s", intToChar(data_buf->moon_rise, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise azimuth: %d", data_buf->moon_rise_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon set: %s", intToChar(data_buf->moon_set, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon set azimuth: %d", data_buf->moon_set_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon age: %d", data_buf->moon_age);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon percent illumination: %d", data_buf->moon_percent_illumination);
-    
-    free(c);
-}
-
-/**
- Max expected slot number is 128 which takes up 8 bits.
- Day key is 13 in decimal shifted 16 bits to the left.
- **/
-uint32_t get_data_storage_key(uint8_t slot) {
-    
-    uint32_t k = 13 << 16;
-    k = k | slot;
-    
-    //APP_LOG(APP_LOG_LEVEL_DEBUG, "slot %d to storage_key %d", slot, (int) k);
-    return k;
-    
-}
 
 static DATA* data_buf;
 
@@ -457,7 +688,7 @@ void in_received_handler(DictionaryIterator *received, void *context) {
     }
     
     if(data_buf->chunk == CHUNK_VALUE_3) {
-//        dump_to_log(data_buf);
+        //dump_to_log(data_buf);
 
         //store the day's worth of data into storage
         uint32_t key = get_data_storage_key(data_buf->day_slot);
@@ -470,14 +701,10 @@ void in_received_handler(DictionaryIterator *received, void *context) {
 
 }
 
-
-
 void in_dropped_handler(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "App message was dropped!");
   // incoming message dropped
 }
-
-// ****** the callback functions...
 
 void initCommunication(void) {
   data_buf = malloc(sizeof(DATA));
