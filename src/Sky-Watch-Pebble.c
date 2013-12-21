@@ -10,7 +10,7 @@ typedef struct config {
 
 static CONFIG *config;
 
-static char* getDayCountdownHeader() {
+static char* get_day_countdown_header() {
     switch(config->day_countdown) {
         case HORIZON:
             return "Daylight";
@@ -25,7 +25,7 @@ static char* getDayCountdownHeader() {
     return 0;
 }
 
-static char* getNightCountdownHeader() {
+static char* get_night_countdown_header() {
     switch(config->day_countdown) {
         case HORIZON:
             return "Dark";
@@ -45,7 +45,7 @@ typedef struct remaining {
     int  mins;
 } REMAINING;
 
-static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
+static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
     time_t* clock = malloc(sizeof(time_t));
     time(clock); //update clock to current time
     struct tm* tm = localtime(clock);
@@ -78,8 +78,8 @@ static void isDay(SEARCH_RESULT *based_on, REMAINING* in) {
 
     int minute_of_day = 60*tm->tm_hour + tm->tm_min;
     
-    //APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
-    //APP_LOG(APP_LOG_LEVEL_INFO, "isDay basedon current_min_of_day: %d ", minute_of_day);
+    //APP_LOG(APP_LOG_LEVEL_INFO, "is_day basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
+    //APP_LOG(APP_LOG_LEVEL_INFO, "is_day basedon current_min_of_day: %d ", minute_of_day);
 
     if(minute_of_day >= today_day_begin && minute_of_day <  today_day_end) {
         in->is_object_up = true;
@@ -276,12 +276,12 @@ static void setup_day_countdown_bufs(void) {
         snprintf(line_2_buf, BUFFER_SIZE, " ");
     } else {
         REMAINING *remaining = malloc(sizeof(REMAINING));
-        isDay(result, remaining);
+        is_day(result, remaining);
         
         if(remaining->is_object_up) {
-            snprintf(line_1_buf, BUFFER_SIZE, getNightCountdownHeader());
+            snprintf(line_1_buf, BUFFER_SIZE, get_night_countdown_header());
         } else {
-            snprintf(line_1_buf, BUFFER_SIZE, getDayCountdownHeader());
+            snprintf(line_1_buf, BUFFER_SIZE, get_day_countdown_header());
         }
         
         countdown_mins_to_char(remaining->mins, line_2_buf, BUFFER_SIZE);

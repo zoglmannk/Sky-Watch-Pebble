@@ -2,15 +2,15 @@
 #include "Watch-Data.h"
 
 
-void convertIntToTime(int t, TIME *time) {
+void convert_int_to_time(int t, TIME *time) {
     time->hour = t/60;
     time->min  = t % 60;
 }
 
-char* convertIntToStr(int t, char *c, int size_of_buf) {
+char* convert_int_to_str(int t, char *c, int size_of_buf) {
     memset(c, 0, size_of_buf);
     TIME *time = malloc(sizeof(TIME));
-    convertIntToTime(t, time);
+    convert_int_to_time(t, time);
     snprintf(c, size_of_buf, "%d:%02d", time->hour, time->min);
     free(time);
     
@@ -26,23 +26,23 @@ void dump_to_log(DATA *data_buf) {
     APP_LOG(APP_LOG_LEVEL_INFO, "data slot: %d", data_buf->day_slot);
     APP_LOG(APP_LOG_LEVEL_INFO, "day of year: %d", data_buf->day_of_year);
     APP_LOG(APP_LOG_LEVEL_INFO, "year: %d", data_buf->year);
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise: %s", convertIntToStr(data_buf->sun_rise, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "sun rise: %s", convert_int_to_str(data_buf->sun_rise, c, c_size));
     APP_LOG(APP_LOG_LEVEL_INFO, "sun rise azimuth: %d", data_buf->sun_rise_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "sun set: %s", convertIntToStr(data_buf->sun_set, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "sun set: %s", convert_int_to_str(data_buf->sun_set, c, c_size));
     APP_LOG(APP_LOG_LEVEL_INFO, "sun set azimuth: %d", data_buf->sun_set_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "solar noon: %s", convertIntToStr(data_buf->solar_noon, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "solar midnight: %s", convertIntToStr(data_buf->solar_midnight, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour begin: %s", convertIntToStr(data_buf->golden_hour_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour end: %s", convertIntToStr(data_buf->golden_hour_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight begin: %s", convertIntToStr(data_buf->civil_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight end: %s", convertIntToStr(data_buf->civil_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight begin: %s", convertIntToStr(data_buf->nautical_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight end: %s", convertIntToStr(data_buf->nautical_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight begin: %s", convertIntToStr(data_buf->astronomical_twilight_begin, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight end: %s", convertIntToStr(data_buf->astronomical_twilight_end, c, c_size));
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise: %s", convertIntToStr(data_buf->moon_rise, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "solar noon: %s", convert_int_to_str(data_buf->solar_noon, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "solar midnight: %s", convert_int_to_str(data_buf->solar_midnight, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour begin: %s", convert_int_to_str(data_buf->golden_hour_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "golden hour end: %s", convert_int_to_str(data_buf->golden_hour_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight begin: %s", convert_int_to_str(data_buf->civil_twilight_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "civil twilight end: %s", convert_int_to_str(data_buf->civil_twilight_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight begin: %s", convert_int_to_str(data_buf->nautical_twilight_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "nautical twilight end: %s", convert_int_to_str(data_buf->nautical_twilight_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight begin: %s", convert_int_to_str(data_buf->astronomical_twilight_begin, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "astronomical twilight end: %s", convert_int_to_str(data_buf->astronomical_twilight_end, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon rise: %s", convert_int_to_str(data_buf->moon_rise, c, c_size));
     APP_LOG(APP_LOG_LEVEL_INFO, "moon rise azimuth: %d", data_buf->moon_rise_azimuth);
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon set: %s", convertIntToStr(data_buf->moon_set, c, c_size));
+    APP_LOG(APP_LOG_LEVEL_INFO, "moon set: %s", convert_int_to_str(data_buf->moon_set, c, c_size));
     APP_LOG(APP_LOG_LEVEL_INFO, "moon set azimuth: %d", data_buf->moon_set_azimuth);
     APP_LOG(APP_LOG_LEVEL_INFO, "moon age: %d", data_buf->moon_age);
     APP_LOG(APP_LOG_LEVEL_INFO, "moon percent illumination: %d", data_buf->moon_percent_illumination);

@@ -77,10 +77,6 @@ typedef struct time {
 } TIME;
 
 
-void convertIntToTime(int i, TIME *time);
-
-char* convertIntToStr(int t, char *c, int size_of_buf);
-
 void dump_to_log(DATA *data_buf);
 
 uint32_t get_data_storage_key(uint8_t slot);
