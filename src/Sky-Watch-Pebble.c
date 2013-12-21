@@ -143,13 +143,7 @@ typedef struct event {
     int  minute_of_day;
 } EVENT;
 
-typedef struct my_event {
-    bool is_object_rising;
-    bool is_today;
-    int  minute_of_day;
-} MY_EVENT;
-
-static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[2]) {
+static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[1]) {
     EVENT *first_event = in[0];
     EVENT *second_event = in[1];
     
@@ -346,14 +340,9 @@ static void min_of_day_to_char(int minute_of_day, char* buf, int buffer_size) {
 }
 
 static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
-    APP_LOG(APP_LOG_LEVEL_INFO, "moon_event_to_char .. event->minute_of_day: %d ", event->minute_of_day);
-    
     char *rise_set =       malloc(sizeof(char)*BUFFER_SIZE);
     char *time =           malloc(sizeof(char)*BUFFER_SIZE);
     char *today_tomorrow = malloc(sizeof(char)*BUFFER_SIZE);
-    
-    APP_LOG(APP_LOG_LEVEL_INFO, "12d event addr: %d  contains: %d", (int) &event, (int) event);
-    APP_LOG(APP_LOG_LEVEL_INFO, "13d rise_set addr: %d", (int) rise_set);
     
     memset(rise_set, 0, BUFFER_SIZE);
     memset(time, 0, BUFFER_SIZE);
@@ -387,24 +376,13 @@ static void setup_moon_tiny_bufs(void) {
         snprintf(line_5_buf, BUFFER_SIZE, "Please use Sky Watch");
         snprintf(line_6_buf, BUFFER_SIZE, "iPhone app to push data.");
     } else {
-        EVENT (*events)[2] = malloc(sizeof(EVENT)*2*2); //only need two!! 
-        memset(events, 0, sizeof(EVENT)*2*2); // WHY is each index of the array indexing with 16 bytes when an event is only 8 bytes!?!?
+        EVENT (*events)[1] = malloc(sizeof(EVENT)*2);
+        memset(events, 0, sizeof(EVENT)*2);
         next_two_moon_events(result, events);
         
-        //APP_LOG(APP_LOG_LEVEL_INFO, "events[0]->minute_of_day: %d ", events[0]->minute_of_day);
-        //APP_LOG(APP_LOG_LEVEL_INFO, "events[1]->minute_of_day: %d ", events[1]->minute_of_day);
-        
-        //EVENT *second_event = events[1];
-        //APP_LOG(APP_LOG_LEVEL_INFO, "second_event->minute_of_day: %d ", second_event->minute_of_day);
-        //APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(uint16_t): %d sizeof(int) %d", sizeof(uint16_t), sizeof(int));
-
-        APP_LOG(APP_LOG_LEVEL_INFO, "events[0] addr: %d   event[1] addr: %d   sizeof(EVENT): %d", (int) &events[0], (int) &events[1], sizeof(EVENT));
-        MY_EVENT (*my_events)[2] = malloc(sizeof(EVENT)*3);
-        APP_LOG(APP_LOG_LEVEL_INFO, "sizeof(MY_EVENT): %d   &my_events[1] - &my_event[0]: %d", sizeof(MY_EVENT), ((int) &my_events[1]) - ((int) &my_events[0]));
         moon_event_to_char(events[0], line_5_buf, BUFFER_SIZE);
         moon_event_to_char(events[1], line_6_buf, BUFFER_SIZE);
-        
-        free(my_events);
+
         free(events);
     }
     
@@ -626,9 +604,6 @@ static void deinit(void) {
   free(date_buf);
 }
 
-// ****** the callback functions...
-
-
 
 static DATA* data_buf;
 
@@ -732,14 +707,10 @@ void in_received_handler(DictionaryIterator *received, void *context) {
 
 }
 
-
-
 void in_dropped_handler(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "App message was dropped!");
   // incoming message dropped
 }
-
-// ****** the callback functions...
 
 void initCommunication(void) {
   data_buf = malloc(sizeof(DATA));
