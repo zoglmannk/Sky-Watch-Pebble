@@ -60,12 +60,6 @@ void dump_to_log(DATA *data_buf) {
 }
 
 
-/**
- Max expected slot number is 128 which takes up 8 bits.
- Day key is 1101 or 13 in decimal shifted 16 bits to the left.
- 
- For slot 0, the returned number in decimal is 851969.
- **/
 uint32_t get_data_storage_key(uint8_t slot) {
     
     uint32_t k = 13 << 16;

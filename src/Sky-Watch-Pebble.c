@@ -345,7 +345,7 @@ static void min_of_day_to_char(int minute_of_day, char* buf, int buffer_size) {
     snprintf(buf, buffer_size, "%d:%d%s", hour, min, am_pm);
 }
 
-static void moon_event_to_char(EVENT *event, char* buf, int buffer_size) {
+static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
     APP_LOG(APP_LOG_LEVEL_INFO, "moon_event_to_char .. event->minute_of_day: %d ", event->minute_of_day);
     
     char *rise_set =       malloc(sizeof(char)*BUFFER_SIZE);
@@ -439,6 +439,7 @@ static void setup_time_buf(void) {
   } else {
     strcpy(time_buf, tmp);
   }
+    //snprintf(time_buf, BUFFER_SIZE, "4:44");
   free(tmp);
   free(clock);
 }
@@ -524,12 +525,10 @@ static void window_load(Window *window) {
   time_layer = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
   text_layer_set_background_color(time_layer, GColorBlack);
   text_layer_set_text_color(time_layer, GColorWhite);
-
-  setup_time_buf();
-
-  //text_layer_set_text(time_layer, "12:44"); //widest?
-  text_layer_set_text(time_layer, time_buf);
   text_layer_set_font(time_layer, fonts_get_system_font("RESOURCE_ID_BITHAM_30_BLACK"));
+  setup_time_buf();
+  //text_layer_set_text(time_layer, "4:44"); //problem starting with 4
+  text_layer_set_text(time_layer, time_buf);
   text_layer_set_text_alignment(time_layer, GTextAlignmentLeft);
   layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
@@ -539,7 +538,6 @@ static void window_load(Window *window) {
   text_layer_set_text_color(date_layer, GColorWhite);
   text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
   memset(date_buf, 0, BUFFER_SIZE);
-  //snprintf(date_buf, BUFFER_SIZE, "Dec 24");
   text_layer_set_text(date_layer, date_buf);
   text_layer_set_text_alignment(date_layer, GTextAlignmentRight);
   layer_add_child(window_layer, text_layer_get_layer(date_layer));
@@ -714,7 +712,7 @@ void in_received_handler(DictionaryIterator *received, void *context) {
     }
     
     if(data_buf->chunk == CHUNK_VALUE_3) {
-//        dump_to_log(data_buf);
+        //dump_to_log(data_buf);
 
         //store the day's worth of data into storage
         uint32_t key = get_data_storage_key(data_buf->day_slot);
