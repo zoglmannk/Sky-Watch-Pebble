@@ -279,9 +279,9 @@ static void setup_day_countdown_bufs(void) {
         isDay(result, remaining);
         
         if(remaining->is_object_up) {
-            snprintf(line_1_buf, BUFFER_SIZE, getDayCountdownHeader());
-        } else {
             snprintf(line_1_buf, BUFFER_SIZE, getNightCountdownHeader());
+        } else {
+            snprintf(line_1_buf, BUFFER_SIZE, getDayCountdownHeader());
         }
         
         countdown_mins_to_char(remaining->mins, line_2_buf, BUFFER_SIZE);
