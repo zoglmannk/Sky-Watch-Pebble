@@ -439,7 +439,14 @@ static void setup_time_buf(void) {
   } else {
     strcpy(time_buf, tmp);
   }
-    //snprintf(time_buf, BUFFER_SIZE, "4:44");
+
+  //work around font rendering issue when starting with 4 with particular font
+    if(time_buf[0] == '4') {
+      memset(tmp, 0, BUFFER_SIZE);
+      snprintf(tmp, BUFFER_SIZE, " %s", time_buf);
+      memset(time_buf, 0, BUFFER_SIZE);
+      strncpy(time_buf, tmp, BUFFER_SIZE);
+    }
   free(tmp);
   free(clock);
 }
