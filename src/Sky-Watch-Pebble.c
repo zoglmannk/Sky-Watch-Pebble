@@ -384,8 +384,8 @@ static void setup_moon_tiny_bufs(void) {
     
     
     if(ret_result == 0) {
-        snprintf(line_5_buf, BUFFER_SIZE, "Please run Sky Watch");
-        snprintf(line_6_buf, BUFFER_SIZE, "iPhone app and push data.");
+        snprintf(line_5_buf, BUFFER_SIZE, "Please use Sky Watch");
+        snprintf(line_6_buf, BUFFER_SIZE, "iPhone app to push data.");
     } else {
         EVENT (*events)[2] = malloc(sizeof(EVENT)*2*2); //only need two!! 
         memset(events, 0, sizeof(EVENT)*2*2); // WHY is each index of the array indexing with 16 bytes when an event is only 8 bytes!?!?
