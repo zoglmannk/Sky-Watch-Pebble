@@ -77,10 +77,6 @@ typedef struct time {
 } TIME;
 
 
-void dump_to_log(DATA *data_buf);
-
-uint32_t get_data_storage_key(uint8_t slot);
-
 typedef struct search_result {
   DATA* today;
   DATA* tomorrow;

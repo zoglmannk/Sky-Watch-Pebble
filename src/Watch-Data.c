@@ -2,11 +2,20 @@
 #include "Watch-Data.h"
 
 
+/**
+ converts the minute of day as an integer and stores the result
+ in the TIME struct.
+ */
 void convert_int_to_time(int t, TIME *time) {
     time->hour = t/60;
     time->min  = t % 60;
 }
 
+
+/**
+ converts the minute of day as an integer, converts it to a
+ string, and stores the result in parameter c.
+ */
 char* convert_int_to_str(int t, char *c, int size_of_buf) {
     memset(c, 0, size_of_buf);
     TIME *time = malloc(sizeof(TIME));
