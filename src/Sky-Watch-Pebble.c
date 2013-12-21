@@ -248,6 +248,72 @@ static char* line_5_buf;
 static char* line_6_buf;
 static char* time_buf;
 static char* date_buf;
+static GColor current_background_color;
+
+static void setup_color_scheme(bool black_background) {
+    if(black_background) {
+        current_background_color = GColorBlack;
+        window_set_background_color(window, GColorBlack);
+        
+        text_layer_set_background_color(text_layer1, GColorBlack);
+        text_layer_set_text_color(text_layer1, GColorWhite);
+        
+        text_layer_set_font(text_layer2, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+        text_layer_set_background_color(text_layer2, GColorBlack);
+        text_layer_set_text_color(text_layer2, GColorWhite);
+        
+        text_layer_set_background_color(text_layer3, GColorBlack);
+        text_layer_set_text_color(text_layer3, GColorWhite);
+        
+        text_layer_set_font(text_layer4, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+        text_layer_set_background_color(text_layer4, GColorBlack);
+        text_layer_set_text_color(text_layer4, GColorWhite);
+        
+        text_layer_set_background_color(text_layer5, GColorBlack);
+        text_layer_set_text_color(text_layer5, GColorWhite);
+        
+        text_layer_set_background_color(text_layer6, GColorBlack);
+        text_layer_set_text_color(text_layer6, GColorWhite);
+        
+        text_layer_set_background_color(time_layer, GColorBlack);
+        text_layer_set_text_color(time_layer, GColorWhite);
+        
+        text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
+        text_layer_set_background_color(date_layer, GColorBlack);
+        text_layer_set_text_color(date_layer, GColorWhite);
+        
+    } else {
+        current_background_color = GColorWhite;
+        window_set_background_color(window, GColorWhite);
+        
+        text_layer_set_background_color(text_layer1, GColorWhite);
+        text_layer_set_text_color(text_layer1, GColorBlack);
+        
+        text_layer_set_font(text_layer2, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+        text_layer_set_background_color(text_layer2, GColorWhite);
+        text_layer_set_text_color(text_layer2, GColorBlack);
+        
+        text_layer_set_background_color(text_layer3, GColorWhite);
+        text_layer_set_text_color(text_layer3, GColorBlack);
+
+        text_layer_set_font(text_layer4, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+        text_layer_set_background_color(text_layer4, GColorWhite);
+        text_layer_set_text_color(text_layer4, GColorBlack);
+        
+        text_layer_set_background_color(text_layer5, GColorBlack);
+        text_layer_set_text_color(text_layer5, GColorWhite);
+        
+        text_layer_set_background_color(text_layer6, GColorBlack);
+        text_layer_set_text_color(text_layer6, GColorWhite);
+        
+        text_layer_set_background_color(time_layer, GColorWhite);
+        text_layer_set_text_color(time_layer, GColorBlack);
+        
+        text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+        text_layer_set_background_color(date_layer, GColorWhite);
+        text_layer_set_text_color(date_layer, GColorBlack);
+    }
+}
 
 static void setup_day_countdown_bufs(void) {
     DATA *today_data = malloc(sizeof(DATA));
@@ -262,14 +328,17 @@ static void setup_day_countdown_bufs(void) {
     if(ret_result == 0) {
         snprintf(line_1_buf, BUFFER_SIZE, "--NO DATA--");
         snprintf(line_2_buf, BUFFER_SIZE, " ");
+        setup_color_scheme(true);
     } else {
         REMAINING *remaining = malloc(sizeof(REMAINING));
         is_day(result, remaining);
         
         if(remaining->is_object_up) {
             snprintf(line_1_buf, BUFFER_SIZE, get_night_countdown_header());
+            setup_color_scheme(false);
         } else {
             snprintf(line_1_buf, BUFFER_SIZE, get_day_countdown_header());
+            setup_color_scheme(true);
         }
         
         countdown_mins_to_char(remaining->mins, line_2_buf, BUFFER_SIZE);
@@ -423,14 +492,21 @@ static void setup_time_buf(void) {
   free(clock);
 }
 
-
 //draws the horizontal line across the display
 static void draw_line_callback(Layer *layer, GContext* ctx) {
+    graphics_context_set_stroke_color(ctx, GColorBlack);
+    graphics_draw_line(ctx, (GPoint) { 15, 0 }, (GPoint) { 144-15,0 });
+}
+
+
+//draws the horizontal line across the display
+static void draw_line_callback2(Layer *layer, GContext* ctx) {
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_draw_line(ctx, (GPoint) { 0, 0 }, (GPoint) { 144,0 });
 }
 
 static void window_load(Window *window) {
+  current_background_color = GColorBlack;
   window_set_background_color(window, GColorBlack); //flip background
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -454,7 +530,7 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer2, line_2_buf);
   text_layer_set_text_alignment(text_layer2, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer2));
-
+    
   //set third line of text
   text_layer3 = text_layer_create((GRect) { .origin = { 0, 0+24+24}, .size = { bounds.size.w, 24} });
   text_layer_set_font(text_layer3, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
@@ -464,6 +540,11 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer3, line_3_buf);
   text_layer_set_text_alignment(text_layer3, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer3));
+    
+    //setup creation of line
+    Layer *line_layer1 = layer_create((GRect) { .origin = { 0, 0+24+28}, .size = {bounds.size.w, 2} });
+    layer_set_update_proc(line_layer1, draw_line_callback);
+    layer_add_child(window_layer, line_layer1);
 
   //set fourth line of text
   text_layer4 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24}, .size = { bounds.size.w, 24} });
@@ -475,10 +556,10 @@ static void window_load(Window *window) {
   text_layer_set_text_alignment(text_layer4, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer4));
 
-  //setup creation of lines
-  Layer *line_layer = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
-  layer_set_update_proc(line_layer, draw_line_callback);
-  layer_add_child(window_layer, line_layer);
+  //setup creation of line
+  Layer *line_layer2 = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
+  layer_set_update_proc(line_layer2, draw_line_callback2);
+  layer_add_child(window_layer, line_layer2);
 
   //set 5th line of text
   text_layer5 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30}, .size = { bounds.size.w, 20} });
@@ -489,16 +570,6 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer5, line_5_buf);
   text_layer_set_text_alignment(text_layer5, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer5));
-
-  //set 6th line of text
-  text_layer6 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30+16}, .size = { bounds.size.w, 20} });
-  text_layer_set_font(text_layer6, fonts_get_system_font("RESOURCE_ID_GOTHIC_14"));
-  text_layer_set_background_color(text_layer6, GColorBlack);
-  text_layer_set_text_color(text_layer6, GColorWhite);
-  memset(line_6_buf, 0, BUFFER_SIZE);
-  text_layer_set_text(text_layer6, line_6_buf);
-  text_layer_set_text_alignment(text_layer6, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer6));
 
   //set 7th line of text
   time_layer = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
@@ -512,7 +583,7 @@ static void window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
   //set 8th line of text
-  date_layer = text_layer_create((GRect) { .origin = { 90, 0+24+24+24+24+38+5}, .size = { 144-90-5, 24} });
+  date_layer = text_layer_create((GRect) { .origin = { 90, 0+24+24+24+24+38+5}, .size = { 144-90-2, 24} });
   text_layer_set_background_color(date_layer, GColorBlack);
   text_layer_set_text_color(date_layer, GColorWhite);
   text_layer_set_font(date_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
@@ -520,7 +591,17 @@ static void window_load(Window *window) {
   text_layer_set_text(date_layer, date_buf);
   text_layer_set_text_alignment(date_layer, GTextAlignmentRight);
   layer_add_child(window_layer, text_layer_get_layer(date_layer));
-  
+
+  //set 6th line of text -- this has to come after line 7 and 8
+  text_layer6 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30+16}, .size = { bounds.size.w, 20} });
+  text_layer_set_font(text_layer6, fonts_get_system_font("RESOURCE_ID_GOTHIC_14"));
+  text_layer_set_background_color(text_layer6, GColorBlack);
+  text_layer_set_text_color(text_layer6, GColorWhite);
+  memset(line_6_buf, 0, BUFFER_SIZE);
+  text_layer_set_text(text_layer6, line_6_buf);
+  text_layer_set_text_alignment(text_layer6, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer6));
+    
   layer_mark_dirty(window_get_root_layer(window));
 }
 
