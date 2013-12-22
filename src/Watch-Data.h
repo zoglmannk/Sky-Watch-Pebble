@@ -78,6 +78,7 @@ typedef struct time {
 
 
 typedef struct search_result {
+  DATA* yesterday;
   DATA* today;
   DATA* tomorrow;
 } SEARCH_RESULT;

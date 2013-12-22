@@ -1,6 +1,8 @@
 #include <pebble.h>
 #include "Watch-Data.h"
 
+static int percent_countdown_sun = -1;
+static int percent_countdown_moon = -1;
 
 typedef enum {HORIZON, CIVIL, NAUTICAL, ASTRONOMICAL} DAY_COUNT_DOWN;
 
@@ -43,6 +45,7 @@ static char* get_night_countdown_header() {
 typedef struct remaining {
     bool is_object_up;
     int  mins;
+    int  of_total_mins;
 } REMAINING;
 
 static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
@@ -50,27 +53,32 @@ static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
     time(clock); //update clock to current time
     struct tm* tm = localtime(clock);
 
+    int yesterday_day_end = 0;
     int today_day_begin = 0;
     int today_day_end   = 0;
     int tomorrow_day_begin = 0;
     
     switch(config->day_countdown) {
         case HORIZON:
+            //yesterday_day_end = based_on->yesterday->sun_set;
             today_day_begin = based_on->today->sun_rise;
             today_day_end   = based_on->today->sun_set;
             tomorrow_day_begin = based_on->tomorrow->sun_rise;
             break;
         case CIVIL:
+            //yesterday_day_end = based_on->yesterday->civil_twilight_end;
             today_day_begin = based_on->today->civil_twilight_begin;
             today_day_end   = based_on->today->civil_twilight_end;
             tomorrow_day_begin = based_on->tomorrow->civil_twilight_begin;
             break;
         case NAUTICAL:
+            //yesterday_day_end = based_on->yesterday->nautical_twilight_end;
             today_day_begin = based_on->today->nautical_twilight_begin;
             today_day_end   = based_on->today->nautical_twilight_end;
             tomorrow_day_begin = based_on->tomorrow->nautical_twilight_begin;
             break;
         case ASTRONOMICAL:
+            //yesterday_day_end = based_on->yesterday->astronomical_twilight_end;
             today_day_begin = based_on->today->astronomical_twilight_begin;
             today_day_end   = based_on->today->astronomical_twilight_end;
             tomorrow_day_begin = based_on->tomorrow->astronomical_twilight_begin;
@@ -84,12 +92,15 @@ static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
     if(minute_of_day >= today_day_begin && minute_of_day <  today_day_end) {
         in->is_object_up = true;
         in->mins = today_day_end - minute_of_day;
+        in->of_total_mins = today_day_end - today_day_begin;
     } else if (minute_of_day < today_day_begin) {
         in->is_object_up = false;
-        in->mins = tomorrow_day_begin - minute_of_day;
+        in->mins = today_day_begin - minute_of_day;
+        in->of_total_mins = 24*60 - yesterday_day_end + today_day_begin;
     } else {
         in->is_object_up = false;
         in->mins = 24*60 - minute_of_day + tomorrow_day_begin;
+        in->of_total_mins = 24*60 - today_day_end + tomorrow_day_begin;
     }
     
     free(clock);
@@ -316,9 +327,12 @@ static void setup_color_scheme(bool black_background) {
 }
 
 static void setup_day_countdown_bufs(void) {
+    DATA *yesterday_data = malloc(sizeof(DATA));
     DATA *today_data = malloc(sizeof(DATA));
     DATA *tomorrow_data = malloc(sizeof(DATA));
     SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    
+    result->yesterday = yesterday_data;
     result->today = today_data;
     result->tomorrow = tomorrow_data;
     
@@ -326,12 +340,15 @@ static void setup_day_countdown_bufs(void) {
     
 
     if(ret_result == 0) {
+        percent_countdown_sun = -1;
         snprintf(line_1_buf, BUFFER_SIZE, "--NO DATA--");
         snprintf(line_2_buf, BUFFER_SIZE, " ");
         setup_color_scheme(true);
     } else {
         REMAINING *remaining = malloc(sizeof(REMAINING));
         is_day(result, remaining);
+        
+        percent_countdown_sun = 100 - (remaining->mins * 100 / remaining->of_total_mins);
         
         if(remaining->is_object_up) {
             snprintf(line_1_buf, BUFFER_SIZE, get_night_countdown_header());
@@ -346,15 +363,18 @@ static void setup_day_countdown_bufs(void) {
         free(remaining);
     }
     
+    free(yesterday_data);
     free(today_data);
     free(tomorrow_data);
     free(result);
 }
 
 static void setup_moon_countdown_bufs(void) {
+    DATA *yesterday_data = malloc(sizeof(DATA));
     DATA *today_data = malloc(sizeof(DATA));
     DATA *tomorrow_data = malloc(sizeof(DATA));
     SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->yesterday = yesterday_data;
     result->today = today_data;
     result->tomorrow = tomorrow_data;
     
@@ -362,11 +382,14 @@ static void setup_moon_countdown_bufs(void) {
     
 
     if(ret_result == 0) {
+        percent_countdown_moon = -1;
         snprintf(line_3_buf, BUFFER_SIZE, "--NO DATA--");
         snprintf(line_4_buf, BUFFER_SIZE, " ");
     } else {
         REMAINING *remaining = malloc(sizeof(REMAINING));
         moon_remaining(result, remaining);
+        
+        percent_countdown_moon = 35;
         
         if(remaining->is_object_up) {
             snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
@@ -379,6 +402,7 @@ static void setup_moon_countdown_bufs(void) {
         free(remaining);
     }
     
+    free(yesterday_data);
     free(today_data);
     free(tomorrow_data);
     free(result);
@@ -409,9 +433,11 @@ static void setup_no_data_tiny_bufs(void) {
 }
 
 static void setup_choosen_twilight_tiny_bufs(void) {
+    DATA *yesterday_data = malloc(sizeof(DATA));
     DATA *today_data = malloc(sizeof(DATA));
     DATA *tomorrow_data = malloc(sizeof(DATA));
     SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->yesterday = yesterday_data;
     result->today = today_data;
     result->tomorrow = tomorrow_data;
     
@@ -457,6 +483,7 @@ static void setup_choosen_twilight_tiny_bufs(void) {
         free(begin);
     }
     
+    free(yesterday_data);
     free(today_data);
     free(tomorrow_data);
     free(result);
@@ -464,9 +491,11 @@ static void setup_choosen_twilight_tiny_bufs(void) {
 
 /** Set this up to get called instead of setup_moon_tiny_bufs **/
 static void setup_sunrise_sunset_tiny_bufs(void) {
+    DATA *yesterday_data = malloc(sizeof(DATA));
     DATA *today_data = malloc(sizeof(DATA));
     DATA *tomorrow_data = malloc(sizeof(DATA));
     SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->yesterday = yesterday_data;
     result->today = today_data;
     result->tomorrow = tomorrow_data;
     
@@ -486,6 +515,7 @@ static void setup_sunrise_sunset_tiny_bufs(void) {
         free(time);
     }
     
+    free(yesterday_data);
     free(today_data);
     free(tomorrow_data);
     free(result);
@@ -515,9 +545,11 @@ static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
 }
 
 static void setup_moon_tiny_bufs(void) {
+    DATA *yesterday_data = malloc(sizeof(DATA));
     DATA *today_data = malloc(sizeof(DATA));
     DATA *tomorrow_data = malloc(sizeof(DATA));
     SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->yesterday = yesterday_data;
     result->today = today_data;
     result->tomorrow = tomorrow_data;
     
@@ -537,6 +569,7 @@ static void setup_moon_tiny_bufs(void) {
         free(events);
     }
     
+    free(yesterday_data);
     free(today_data);
     free(tomorrow_data);
     free(result);
@@ -619,6 +652,53 @@ static void setup_time_buf(void) {
   free(clock);
 }
 
+static void draw_bar_graph(Layer *layer, GContext* ctx, int percent_complete) {
+    
+    if(current_background_color == GColorBlack) {
+        graphics_context_set_stroke_color(ctx, GColorWhite);
+    } else {
+        graphics_context_set_stroke_color(ctx, GColorBlack);
+    }
+    
+    graphics_draw_rect(ctx, (GRect) { .origin = { 3, 0 }, .size = { 5, 42 } });
+    
+    graphics_draw_line(ctx, (GPoint) { 2,  0 }, (GPoint) {  2,  0 } ); //100% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8,  0 }, (GPoint) {  8,  0 } ); //100% mark right of bar
+    
+    graphics_draw_line(ctx, (GPoint) { 0, 11 }, (GPoint) {  2, 11 } ); //75% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, 11 }, (GPoint) { 10, 11 } ); //75% mark right of bar
+    
+    graphics_draw_line(ctx, (GPoint) { 0, 21 }, (GPoint) {  2, 21 } ); //50% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, 21 }, (GPoint) { 10, 21 } ); //50% mark right of bar
+    
+    graphics_draw_line(ctx, (GPoint) { 0, 32 }, (GPoint) {  2, 32 } ); //25% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, 32 }, (GPoint) { 10, 32 } ); //25% mark right of bar
+    
+    graphics_draw_line(ctx, (GPoint) { 2, 41 }, (GPoint) {  2, 41 } ); //0% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, 41 }, (GPoint) {  8, 41 } ); //0% mark right of bar
+    
+    int height = 42 * percent_complete / 100;
+    
+    graphics_fill_rect(ctx, (GRect) { .origin = { 3, 42 - height}, .size = { 5, height } }, 0, 0);
+}
+
+
+static void draw_bar_graph_for_sun(Layer *layer, GContext *ctx) {
+    
+    if(percent_countdown_sun >= 0) {
+        draw_bar_graph(layer, ctx, percent_countdown_sun);
+    }
+    
+}
+
+
+static void draw_bar_graph_for_moon(Layer *layer, GContext *ctx) {
+    
+    if(percent_countdown_moon >= 0) {
+        draw_bar_graph(layer, ctx, 35);
+    }
+}
+
 //draws the horizontal line across the display
 static void draw_line_callback(Layer *layer, GContext* ctx) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
@@ -682,6 +762,16 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer4, line_4_buf);
   text_layer_set_text_alignment(text_layer4, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer4));
+    
+  //setup bar graph for light/dark countdown
+  Layer *light_dark_bar_layer = layer_create((GRect) { .origin = { 2, 5 }, .size = { 12, 48-5} });
+  layer_set_update_proc(light_dark_bar_layer, draw_bar_graph_for_sun);
+  layer_add_child(window_layer, light_dark_bar_layer);
+    
+  //setup bar graph for moon rise/set countdown
+  Layer *moon_rise_set_layer = layer_create((GRect) { .origin = { 2, 5+24+24+3 }, .size = { 12, 48-5} });
+  layer_set_update_proc(moon_rise_set_layer, draw_bar_graph_for_moon);
+  layer_add_child(window_layer, moon_rise_set_layer);
 
   //setup creation of line visible on black background
   Layer *line_layer2 = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
