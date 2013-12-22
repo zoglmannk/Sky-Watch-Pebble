@@ -399,7 +399,96 @@ static void min_of_day_to_char(int minute_of_day, char* buf, int buffer_size) {
     
     //APP_LOG(APP_LOG_LEVEL_INFO, "min_of_day_to_char called with min_of_day: %d am_pm: NA", minute_of_day);
     
-    snprintf(buf, buffer_size, "%d:%d%s", hour, min, am_pm);
+    snprintf(buf, buffer_size, "%d:%02d%s", hour, min, am_pm);
+}
+
+
+static void setup_no_data_tiny_bufs(void) {
+    snprintf(line_5_buf, BUFFER_SIZE, "Please use Sky Watch");
+    snprintf(line_6_buf, BUFFER_SIZE, "iPhone app to push data.");
+}
+
+static void setup_choosen_twilight_tiny_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+    int twilight_begin = 0;
+    int twilight_end   = 0;
+    char *kind_of_twilight = "";
+    
+    
+    if(ret_result == 0) {
+        setup_no_data_tiny_bufs();
+    } else {
+        switch(config->day_countdown) {
+            case CIVIL:
+                kind_of_twilight = "Civil";
+                twilight_begin = result->today->civil_twilight_begin;
+                twilight_end   = result->today->civil_twilight_end;
+                break;
+            case NAUTICAL:
+                kind_of_twilight = "Nautical";
+                twilight_begin = result->today->nautical_twilight_begin;
+                twilight_end   = result->today->nautical_twilight_end;
+                break;
+            case ASTRONOMICAL:
+                kind_of_twilight = "Astronomical";
+                twilight_begin = result->today->astronomical_twilight_begin;
+                twilight_end   = result->today->astronomical_twilight_end;
+                break;
+            default:
+                return; //don't setup display
+        }
+        
+        snprintf(line_5_buf, BUFFER_SIZE, "%s Twilight", kind_of_twilight);
+        
+        char *begin = malloc(sizeof(char)*BUFFER_SIZE);
+        char *end = malloc(sizeof(char)*BUFFER_SIZE);
+        min_of_day_to_char(twilight_begin, begin, BUFFER_SIZE);
+        min_of_day_to_char(twilight_end, end, BUFFER_SIZE);
+        snprintf(line_6_buf, BUFFER_SIZE, "Begin %s - End %s", begin, end);
+        
+        free(end);
+        free(begin);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+}
+
+/** Set this up to get called instead of setup_moon_tiny_bufs **/
+static void setup_sunrise_sunset_tiny_bufs(void) {
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+    if(ret_result == 0) {
+        setup_no_data_tiny_bufs();
+    } else {
+        char *time = malloc(sizeof(char)*BUFFER_SIZE);
+        
+        min_of_day_to_char(result->today->sun_rise, time, BUFFER_SIZE);
+        snprintf(line_5_buf, BUFFER_SIZE, "Sunrise %s", time);
+        
+        min_of_day_to_char(result->today->sun_set, time, BUFFER_SIZE);
+        snprintf(line_6_buf, BUFFER_SIZE, "Sunset %s", time);
+        
+        free(time);
+    }
+    
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
 }
 
 static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
@@ -436,8 +525,7 @@ static void setup_moon_tiny_bufs(void) {
     
     
     if(ret_result == 0) {
-        snprintf(line_5_buf, BUFFER_SIZE, "Please use Sky Watch");
-        snprintf(line_6_buf, BUFFER_SIZE, "iPhone app to push data.");
+        setup_no_data_tiny_bufs();
     } else {
         EVENT (*events)[1] = malloc(sizeof(EVENT)*2);
         memset(events, 0, sizeof(EVENT)*2);
@@ -452,6 +540,45 @@ static void setup_moon_tiny_bufs(void) {
     free(today_data);
     free(tomorrow_data);
     free(result);
+}
+
+typedef enum {TWILIGHT, SUNRISE_SUNSET, MOON_RISE_SET} TINY_DISPLAY;
+
+static TINY_DISPLAY next_tiny_display;
+static int tiny_display_count = 0;
+static bool force_display_tiny_bufs = true;
+
+static void setup_tiny_bufs() {
+    
+    tiny_display_count++;
+    if(tiny_display_count >= 1000) {
+        tiny_display_count = 0;
+    }
+    
+    //only change the display every 8 seconds
+    if(tiny_display_count%8 != 0 && !force_display_tiny_bufs) {
+        return;
+    }
+    
+    force_display_tiny_bufs = false;
+    
+    switch(next_tiny_display) {
+        case TWILIGHT:
+            setup_choosen_twilight_tiny_bufs();
+            next_tiny_display = SUNRISE_SUNSET;
+            break;
+        case SUNRISE_SUNSET:
+            setup_sunrise_sunset_tiny_bufs();
+            next_tiny_display = MOON_RISE_SET;
+            break;
+        case MOON_RISE_SET:
+            setup_moon_tiny_bufs();
+            next_tiny_display = TWILIGHT;
+            break;
+        default:
+            next_tiny_display = SUNRISE_SUNSET;
+    }
+    
 }
 
 static void setup_date_buf(void) {
@@ -541,10 +668,10 @@ static void window_load(Window *window) {
   text_layer_set_text_alignment(text_layer3, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer3));
     
-    //setup creation of line
-    Layer *line_layer1 = layer_create((GRect) { .origin = { 0, 0+24+28}, .size = {bounds.size.w, 2} });
-    layer_set_update_proc(line_layer1, draw_line_callback);
-    layer_add_child(window_layer, line_layer1);
+  //setup creation of line visible on white background
+  Layer *line_layer1 = layer_create((GRect) { .origin = { 0, 0+24+28}, .size = {bounds.size.w, 2} });
+  layer_set_update_proc(line_layer1, draw_line_callback);
+  layer_add_child(window_layer, line_layer1);
 
   //set fourth line of text
   text_layer4 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24}, .size = { bounds.size.w, 24} });
@@ -556,7 +683,7 @@ static void window_load(Window *window) {
   text_layer_set_text_alignment(text_layer4, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer4));
 
-  //setup creation of line
+  //setup creation of line visible on black background
   Layer *line_layer2 = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
   layer_set_update_proc(line_layer2, draw_line_callback2);
   layer_add_child(window_layer, line_layer2);
@@ -603,6 +730,7 @@ static void window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(text_layer6));
     
   layer_mark_dirty(window_get_root_layer(window));
+    
 }
 
 static void window_unload(Window *window) {
@@ -626,12 +754,11 @@ static void setup_time_and_date_callback(void* data) {
 
   setup_time_buf();
   setup_date_buf();
-
     
   setup_day_countdown_bufs();
   setup_moon_countdown_bufs();
-  setup_moon_tiny_bufs();
-  
+    
+  setup_tiny_bufs();
     
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
@@ -646,6 +773,9 @@ static void setup_time_and_date_callback(void* data) {
 static void init(void) {
   config = malloc(sizeof(CONFIG));
   config->day_countdown = ASTRONOMICAL;
+    
+  force_display_tiny_bufs = true;
+  next_tiny_display = TWILIGHT;
     
   line_1_buf = malloc(BUFFER_SIZE * sizeof(char));
   line_2_buf = malloc(BUFFER_SIZE * sizeof(char));
