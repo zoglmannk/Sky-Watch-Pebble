@@ -638,16 +638,6 @@ static void window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
-  //set first line of text
-  text_layer1 = text_layer_create((GRect) { .origin = { 0, 0 }, .size = { bounds.size.w, 24 } });
-  text_layer_set_font(text_layer1, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
-  text_layer_set_background_color(text_layer1, GColorBlack);
-  text_layer_set_text_color(text_layer1, GColorWhite);
-  text_layer_set_text(text_layer1, line_1_buf);
-  memset(line_1_buf, 0, BUFFER_SIZE);
-  text_layer_set_text_alignment(text_layer1, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer1));
-
   //set second line of text
   text_layer2 = text_layer_create((GRect) { .origin = { 0, 0+24}, .size = { bounds.size.w, 24} });
   text_layer_set_font(text_layer2, fonts_get_system_font("RESOURCE_ID_GOTHIC_24"));
@@ -657,6 +647,16 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer2, line_2_buf);
   text_layer_set_text_alignment(text_layer2, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer2));
+    
+  //set first line of text
+  text_layer1 = text_layer_create((GRect) { .origin = { 0, 0 }, .size = { bounds.size.w, 29 } });
+  text_layer_set_font(text_layer1, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+  text_layer_set_background_color(text_layer1, GColorBlack);
+  text_layer_set_text_color(text_layer1, GColorWhite);
+  text_layer_set_text(text_layer1, line_1_buf);
+  memset(line_1_buf, 0, BUFFER_SIZE);
+  text_layer_set_text_alignment(text_layer1, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(text_layer1));
     
   //set third line of text
   text_layer3 = text_layer_create((GRect) { .origin = { 0, 0+24+24}, .size = { bounds.size.w, 24} });
