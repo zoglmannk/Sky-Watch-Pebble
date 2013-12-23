@@ -78,27 +78,35 @@ SEARCH_RESULT* locate_data_for_current_date(SEARCH_RESULT* in) {
   time(clock); //update clock to current time
   struct tm* tm = localtime(clock);
 
+  DATA *retrieved_yesterday = malloc(sizeof(DATA));
   DATA *retrieved_today = malloc(sizeof(DATA));
   DATA *retrieved_tomorrow = malloc(sizeof(DATA));
 
+  DATA *found_yesterday = 0;
   DATA *found_today = 0;
   DATA *found_tomorrow = 0;
   for(int i=0; i<MAX_DATA_SLOTS-1; i++) {
-    uint32_t storage_key_today    = get_data_storage_key(i);
-    uint32_t storage_key_tomorrow = get_data_storage_key(i+1);
+    uint32_t storage_key_yesterday= get_data_storage_key(i);
+    uint32_t storage_key_today    = get_data_storage_key(i+1);
+    uint32_t storage_key_tomorrow = get_data_storage_key(i+2);
 
-    if(persist_exists(storage_key_today) && persist_exists(storage_key_tomorrow)) {
+    if(persist_exists(storage_key_yesterday) && 
+       persist_exists(storage_key_today) && 
+       persist_exists(storage_key_tomorrow)) {
+
       memset(retrieved_today, 0, sizeof(DATA));
       persist_read_data(storage_key_today, retrieved_today, sizeof(DATA)); 
 
       if(retrieved_today->year == tm->tm_year+1900 &&
          retrieved_today->day_of_year == tm->tm_yday+1) {
 
-        //APP_LOG(APP_LOG_LEVEL_INFO, "found matching stored data with day of year: %d", retrieved_today->day_of_year);
+        memset(retrieved_yesterday,0, sizeof(DATA));
+        persist_read_data(storage_key_yesterday, retrieved_yesterday, sizeof(DATA));
 
         memset(retrieved_tomorrow, 0, sizeof(DATA));
         persist_read_data(storage_key_tomorrow, retrieved_tomorrow, sizeof(DATA)); 
 
+        found_yesterday = retrieved_yesterday;
         found_today = retrieved_today;
         found_tomorrow = retrieved_tomorrow;
         break;
@@ -109,10 +117,12 @@ SEARCH_RESULT* locate_data_for_current_date(SEARCH_RESULT* in) {
   }
 
   if(found_today) {
+    memcpy(in->yesterday, found_yesterday, sizeof(DATA));
     memcpy(in->today, found_today, sizeof(DATA));
     memcpy(in->tomorrow, found_tomorrow, sizeof(DATA));
   }
 
+  free(retrieved_yesterday);
   free(retrieved_today);
   free(retrieved_tomorrow);
   free(clock);
