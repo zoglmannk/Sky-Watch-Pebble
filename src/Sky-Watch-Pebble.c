@@ -673,8 +673,10 @@ static void draw_bar_graph(Layer *layer, GContext* ctx, int percent_complete) {
     
     if(current_background_color == GColorBlack) {
         graphics_context_set_stroke_color(ctx, GColorWhite);
+        graphics_context_set_fill_color(ctx, GColorWhite);
     } else {
         graphics_context_set_stroke_color(ctx, GColorBlack);
+        graphics_context_set_fill_color(ctx, GColorBlack);
     }
     
     graphics_draw_rect(ctx, (GRect) { .origin = { 3, 0 }, .size = { 5, 42 } });
