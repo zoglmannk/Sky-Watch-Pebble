@@ -112,36 +112,52 @@ static void moon_remaining(SEARCH_RESULT *based_on, REMAINING *in) {
     struct tm* tm = localtime(clock);
     
     int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    
+    int last_yesterday_event = based_on->yesterday->moon_rise;
+    if(based_on->yesterday->moon_set > last_yesterday_event) {
+        last_yesterday_event = based_on->yesterday->moon_set;
+    }
+    
+    int last_today_event = based_on->today->moon_rise;
+    if(based_on->today->moon_set > last_today_event) {
+        last_today_event = based_on->today->moon_set;
+    }
 
     if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_set) {
         //upcoming moon set and countdown = set - time
         in->is_object_up = true;
         in->mins = based_on->today->moon_set - minute_of_day;
+        in->of_total_mins = 24*60 - based_on->today->moon_set + last_yesterday_event;
         
     } else if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_rise) {
         //upcoming moon rise and countdown = rise - time
         in->is_object_up = false;
         in->mins = based_on->today->moon_rise - minute_of_day;
+        in->of_total_mins = based_on->today->moon_rise - based_on->today->moon_set;
         
     } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_rise) {
         //upcoming moon rise and countdown = rise - time
         in->is_object_up = false;
         in->mins = based_on->today->moon_rise - minute_of_day;
+        in->of_total_mins = 24*60 - based_on->today->moon_rise + last_yesterday_event;
         
     } else if (based_on->today->moon_rise < based_on->today->moon_set && minute_of_day < based_on->today->moon_set) {
         //upcoming moon set and countdown = set - time
         in->is_object_up = true;
         in->mins = based_on->today->moon_set - minute_of_day;
+        in->of_total_mins = based_on->today->moon_set - based_on->today->moon_rise;
         
     } else if (based_on->tomorrow->moon_set < based_on->tomorrow->moon_rise) {
         //upcoming moon set and countdown = 24hr - time + next set
         in->is_object_up = true;
         in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_set;
+        in->of_total_mins = 24*60 - last_today_event + based_on->tomorrow->moon_set;
         
     } else {
         //upcoming moon rise and countdown = 24hr - time + next rise
         in->is_object_up = false;
         in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_rise;
+        in->of_total_mins = 24*60 - last_today_event + based_on->tomorrow->moon_rise;
         
     }
 
@@ -389,7 +405,8 @@ static void setup_moon_countdown_bufs(void) {
         REMAINING *remaining = malloc(sizeof(REMAINING));
         moon_remaining(result, remaining);
         
-        percent_countdown_moon = 35;
+        percent_countdown_moon = 100 - (remaining->mins * 100 / remaining->of_total_mins);
+        //APP_LOG(APP_LOG_LEVEL_INFO, "setup_moon_countdown mins %d: total_mins: %d percent %d", remaining->mins, remaining->of_total_mins, percent_countdown_moon);
         
         if(remaining->is_object_up) {
             snprintf(line_3_buf, BUFFER_SIZE, "Moon Set");
@@ -695,7 +712,7 @@ static void draw_bar_graph_for_sun(Layer *layer, GContext *ctx) {
 static void draw_bar_graph_for_moon(Layer *layer, GContext *ctx) {
     
     if(percent_countdown_moon >= 0) {
-        draw_bar_graph(layer, ctx, 35);
+        draw_bar_graph(layer, ctx, percent_countdown_moon);
     }
 }
 
