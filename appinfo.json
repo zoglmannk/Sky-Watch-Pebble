@@ -12,6 +12,107 @@
     "dummy": 0
   },
   "resources": {
-    "media": []
+    "media": [
+      {
+        "type": "png",
+        "name": "MOON_FIRST_QUARTER_BLACK",
+        "file": "images/moon-first-quarter-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_FIRST_QUARTER_WHITE",
+        "file": "images/moon-first-quarter-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_FULL_BLACK",
+        "file": "images/moon-full-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_FULL_WHITE",
+        "file": "images/moon-full-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_LAST_QUARTER_BLACK",
+        "file": "images/moon-last-quarter-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_LAST_QUARTER_WHITE",
+        "file": "images/moon-last-quarter-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_NEW_BLACK",
+        "file": "images/moon-new-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_NEW_WHITE",
+        "file": "images/moon-new-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WANING_CRESCENT_BLACK",
+        "file": "images/moon-waning-crescent-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WANING_CRESCENT_WHITE",
+        "file": "images/moon-waning-crescent-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WANING_GIBBOUS_BLACK",
+        "file": "images/moon-waning-gibbous-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WANING_GIBBOUS_WHITE",
+        "file": "images/moon-waning-gibbous-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WANING_HALF_BLACK",
+        "file": "images/moon-waning-half-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WANING_HALF_WHITE",
+        "file": "images/moon-waning-half-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WAXING_CRESCENT_BLACK",
+        "file": "images/moon-waxing-crescent-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WAXING_CRESCENT_WHITE",
+        "file": "images/moon-waxing-crescent-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WAXING_GIBBOUS_BLACK",
+        "file": "images/moon-waxing-gibbous-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WAXING_GIBBOUS_WHITE",
+        "file": "images/moon-waxing-gibbous-white.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WAXING_HALF_BLACK",
+        "file": "images/moon-waxing-half-black.png"
+      },
+      {
+        "type": "png",
+        "name": "MOON_WAXING_HALF_WHITE",
+        "file": "images/moon-waxing-half-white.png"
+      }
+    ]
   }
 }
