@@ -937,11 +937,6 @@ static void window_load(Window *window) {
   Layer *moon_rise_set_layer = layer_create((GRect) { .origin = { 2, 5+24+24+3 }, .size = { 12, 48-5} });
   layer_set_update_proc(moon_rise_set_layer, draw_bar_graph_for_moon);
   layer_add_child(window_layer, moon_rise_set_layer);
-
-  //setup creation of line visible on black background
-  Layer *line_layer2 = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
-  layer_set_update_proc(line_layer2, draw_line_callback2);
-  layer_add_child(window_layer, line_layer2);
     
     
     //setup moon phase image layer
@@ -959,6 +954,11 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer5, line_5_buf);
   text_layer_set_text_alignment(text_layer5, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer5));
+    
+  //setup creation of line visible on black background
+  Layer *line_layer2 = layer_create((GRect) { .origin = { 0, 0+24+24+24+30}, .size = {bounds.size.w, 2} });
+  layer_set_update_proc(line_layer2, draw_line_callback2);
+  layer_add_child(window_layer, line_layer2);
 
   //set 7th line of text
   time_layer = text_layer_create((GRect) { .origin = { 5, 0+24+24+24+24+38}, .size = { 97, 46} });
