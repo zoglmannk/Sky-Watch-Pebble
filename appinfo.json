@@ -26,12 +26,12 @@
       {
         "type": "png",
         "name": "MOON_FULL_BLACK",
-        "file": "images/moon-first-quarter-black.png"
+        "file": "images/moon-full-black.png"
       },
       {
         "type": "png",
         "name": "MOON_FULL_WHITE",
-        "file": "images/moon-first-quarter-white.png"
+        "file": "images/moon-full-white.png"
       },
       {
         "type": "png",

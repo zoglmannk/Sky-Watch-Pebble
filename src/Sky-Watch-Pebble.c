@@ -734,8 +734,148 @@ static void draw_line_callback2(Layer *layer, GContext* ctx) {
 }
 
 
-static BitmapLayer *image_layer = (void*) 0;
-static GBitmap *image = (void*) 0;
+static BitmapLayer *moon_image_layer = (void*) 0;
+static GBitmap *moon_image = (void*) 0;
+
+//WARNING: something should be done to make this more accurate. The Age of Moon is not that accurate.
+//it can skip days!!
+static void setup_moon_image_layer() {
+    
+    DATA *yesterday_data = malloc(sizeof(DATA));
+    DATA *today_data = malloc(sizeof(DATA));
+    DATA *tomorrow_data = malloc(sizeof(DATA));
+    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
+    result->yesterday = yesterday_data;
+    result->today = today_data;
+    result->tomorrow = tomorrow_data;
+    
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+    if(ret_result != 0) {
+        REMAINING *remaining = malloc(sizeof(REMAINING));
+        
+        if(moon_image != 0 ) {
+            gbitmap_destroy(moon_image);
+            moon_image = 0;
+        }
+        
+        is_day(result, remaining);
+        
+        //APP_LOG(APP_LOG_LEVEL_DEBUG, "set image to waning_half_white moon age: %d", result->today->moon_age);
+        
+        switch (result->today->moon_age) {
+            case 1:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_NEW_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_NEW_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 1");
+                break;
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WAXING_CRESCENT_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WAXING_CRESCENT_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 2");
+                break;
+            case 6:
+            case 7:
+            case 8:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_FIRST_QUARTER_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_FIRST_QUARTER_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 3");
+                break;
+            case 9:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WAXING_HALF_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WAXING_HALF_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 4");
+                break;
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WAXING_GIBBOUS_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WAXING_GIBBOUS_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 5");
+                break;
+            case 14:
+            case 15:
+            case 16:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_FULL_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_FULL_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 6");
+                break;
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_GIBBOUS_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_GIBBOUS_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 7");
+                break;
+            case 21:
+            case 22:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_HALF_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_HALF_BLACK);
+                }
+                    APP_LOG(APP_LOG_LEVEL_DEBUG, "case 8");
+                break;
+            case 23:
+            case 24:
+            case 25:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_LAST_QUARTER_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_LAST_QUARTER_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 9");
+                break;
+            case 26:
+            case 27:
+            case 28:
+            case 29:
+                if(remaining->is_object_up) {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_CRESCENT_WHITE);
+                } else {
+                    moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_CRESCENT_BLACK);
+                }
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 10");
+                break;
+        }
+        
+        
+        bitmap_layer_set_bitmap(moon_image_layer, moon_image);
+        free(remaining);
+    }
+    
+    free(yesterday_data);
+    free(today_data);
+    free(tomorrow_data);
+    free(result);
+    
+}
 
 static void window_load(Window *window) {
   current_background_color = GColorBlack;
@@ -804,12 +944,10 @@ static void window_load(Window *window) {
   layer_add_child(window_layer, line_layer2);
     
     
-    //TEST
-    image_layer = bitmap_layer_create((GRect) { .origin = { 144-25, 5+24+24+10}, .size = {20, 20} });
-    image = gbitmap_create_with_resource(RESOURCE_ID_MOON_FIRST_QUARTER_BLACK);
-    bitmap_layer_set_bitmap(image_layer, image);
-    bitmap_layer_set_alignment(image_layer, GAlignCenter);
-    layer_add_child(window_layer, bitmap_layer_get_layer(image_layer));
+    //setup moon phase image layer
+    moon_image_layer = bitmap_layer_create((GRect) { .origin = { 144-25, 5+24+24+10}, .size = {20, 20} });
+    bitmap_layer_set_alignment(moon_image_layer, GAlignCenter);
+    layer_add_child(window_layer, bitmap_layer_get_layer(moon_image_layer));
     
 
   //set 5th line of text
@@ -865,6 +1003,13 @@ static void window_unload(Window *window) {
   text_layer_destroy(text_layer5);
   text_layer_destroy(time_layer);
   text_layer_destroy(date_layer);
+  bitmap_layer_destroy(moon_image_layer);
+    
+  if(moon_image != 0) {
+    gbitmap_destroy(moon_image);
+    moon_image = (void*) 0;
+  }
+     
 }
 
 static void setup_time_and_date_callback(void* data) {
@@ -883,6 +1028,8 @@ static void setup_time_and_date_callback(void* data) {
   setup_moon_countdown_bufs();
     
   setup_tiny_bufs();
+    
+  setup_moon_image_layer();
     
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
