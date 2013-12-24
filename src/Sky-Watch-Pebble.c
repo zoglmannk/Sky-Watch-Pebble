@@ -718,6 +718,8 @@ static void draw_bar_graph_for_moon(Layer *layer, GContext *ctx) {
     }
 }
 
+
+
 //draws the horizontal line across the display
 static void draw_line_callback(Layer *layer, GContext* ctx) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
@@ -730,6 +732,10 @@ static void draw_line_callback2(Layer *layer, GContext* ctx) {
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_draw_line(ctx, (GPoint) { 0, 0 }, (GPoint) { 144,0 });
 }
+
+
+static BitmapLayer *image_layer = (void*) 0;
+static GBitmap *image = (void*) 0;
 
 static void window_load(Window *window) {
   current_background_color = GColorBlack;
@@ -796,6 +802,15 @@ static void window_load(Window *window) {
   Layer *line_layer2 = layer_create((GRect) { .origin = { 0, 0+24+24+24+28}, .size = {bounds.size.w, 2} });
   layer_set_update_proc(line_layer2, draw_line_callback2);
   layer_add_child(window_layer, line_layer2);
+    
+    
+    //TEST
+    image_layer = bitmap_layer_create((GRect) { .origin = { 144-25, 5+24+24+10}, .size = {20, 20} });
+    image = gbitmap_create_with_resource(RESOURCE_ID_MOON_FIRST_QUARTER_BLACK);
+    bitmap_layer_set_bitmap(image_layer, image);
+    bitmap_layer_set_alignment(image_layer, GAlignCenter);
+    layer_add_child(window_layer, bitmap_layer_get_layer(image_layer));
+    
 
   //set 5th line of text
   text_layer5 = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30}, .size = { bounds.size.w, 20} });
