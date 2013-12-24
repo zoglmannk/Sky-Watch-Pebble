@@ -840,7 +840,7 @@ static void setup_moon_image_layer() {
                 } else {
                     moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_WANING_HALF_BLACK);
                 }
-                    APP_LOG(APP_LOG_LEVEL_DEBUG, "case 8");
+                //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 8");
                 break;
             case 23:
             case 24:
