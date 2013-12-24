@@ -436,6 +436,8 @@ static void min_of_day_to_char(int minute_of_day, char* buf, int buffer_size) {
     if(hour > 12) {
         hour -= 12;
         am_pm = "p";
+    } else if (hour == 0) {
+        hour = 12;
     }
     
     //APP_LOG(APP_LOG_LEVEL_INFO, "min_of_day_to_char called with min_of_day: %d am_pm: NA", minute_of_day);
