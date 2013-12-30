@@ -48,11 +48,17 @@ typedef struct remaining {
     int  of_total_mins;
 } REMAINING;
 
-static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
+static int min_of_day() {
     time_t* clock = malloc(sizeof(time_t));
     time(clock); //update clock to current time
     struct tm* tm = localtime(clock);
+    
+    free(clock);
+ 
+    return 60*tm->tm_hour + tm->tm_min;
+}
 
+static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
     int yesterday_day_end = 0;
     int today_day_begin = 0;
     int today_day_end   = 0;
@@ -84,7 +90,7 @@ static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
             tomorrow_day_begin = based_on->tomorrow->astronomical_twilight_begin;
     }
 
-    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    int minute_of_day = min_of_day();
     
     //APP_LOG(APP_LOG_LEVEL_INFO, "is_day basedon day_begin: %d and day_end: %d", today_day_begin, today_day_end);
     //APP_LOG(APP_LOG_LEVEL_INFO, "is_day basedon current_min_of_day: %d ", minute_of_day);
@@ -103,15 +109,10 @@ static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
         in->of_total_mins = 24*60 - today_day_end + tomorrow_day_begin;
     }
     
-    free(clock);
 }
 
 static void moon_remaining(SEARCH_RESULT *based_on, REMAINING *in) {
-    time_t* clock = malloc(sizeof(time_t));
-    time(clock); //update clock to current time
-    struct tm* tm = localtime(clock);
-    
-    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    int minute_of_day = min_of_day();
     
     int last_yesterday_event = based_on->yesterday->moon_rise;
     if(based_on->yesterday->moon_set > last_yesterday_event) {
@@ -158,10 +159,8 @@ static void moon_remaining(SEARCH_RESULT *based_on, REMAINING *in) {
         in->is_object_up = false;
         in->mins = 24*60 - minute_of_day + based_on->tomorrow->moon_rise;
         in->of_total_mins = 24*60 - last_today_event + based_on->tomorrow->moon_rise;
-        
     }
 
-    free(clock);
 }
 
 typedef struct event {
@@ -174,11 +173,7 @@ static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[1]) {
     EVENT *first_event = in[0];
     EVENT *second_event = in[1];
     
-    time_t* clock = malloc(sizeof(time_t));
-    time(clock); //update clock to current time
-    struct tm* tm = localtime(clock);
-    
-    int minute_of_day = 60*tm->tm_hour + tm->tm_min;
+    int minute_of_day = min_of_day();
     
     if (based_on->today->moon_set < based_on->today->moon_rise && minute_of_day < based_on->today->moon_set) {
         //upcoming today moon set, then today moon rise
@@ -242,7 +237,6 @@ static void next_two_moon_events(SEARCH_RESULT *based_on, EVENT (*in)[1]) {
         
     }
     
-    free(clock);
 }
 
 static void countdown_mins_to_char(int mins, char* buf, int buffer_size) {
@@ -1056,10 +1050,63 @@ static void window_unload(Window *window) {
      
 }
 
+
+static int vibration_notification_counter = 0;
+static TIME *next_vibration_time = 0;
+
+static void vibrate_for_notification(void) {
+    
+    if(next_vibration_time == 0) {
+        return;
+    }
+    
+    int minute_of_day = min_of_day();
+    int next_vibration_min_of_day = next_vibration_time->hour*60 + next_vibration_time->min;
+    
+    if(minute_of_day == next_vibration_min_of_day) {
+
+        if(vibration_notification_counter % 3 == 0) {
+            static const uint32_t const segments[] = {
+                50, 50, 100,
+                50, 50, 100,
+                50, 50, 100,
+                50, 50, 100,
+            
+                50, 50, 500,
+            
+                25, 25, 25,
+                25, 25, 25,
+                25, 25, 25,
+                25, 25, 25,
+                25, 25, 25,
+                25, 25, 25,
+                25, 25, 25,
+            };
+            VibePattern vibration_pattern = {
+                .durations = segments,
+                .num_segments = ARRAY_LENGTH(segments),
+            };
+        
+            vibes_enqueue_custom_pattern(vibration_pattern);
+        
+        }
+    
+        vibration_notification_counter++;
+        
+        if(vibration_notification_counter >= 7) {
+            vibration_notification_counter = 0;
+            free(next_vibration_time);
+            next_vibration_time = 0;
+        }
+        
+    }
+    
+}
+
 static void setup_time_and_date_callback(void* data) {
   char* previous_time_buf = malloc(BUFFER_SIZE * sizeof(char));
   memset(previous_time_buf, 0, BUFFER_SIZE);
-  strcpy(previous_time_buf, time_buf);  
+  strcpy(previous_time_buf, time_buf);
 
   char* previous_date_buf = malloc(BUFFER_SIZE * sizeof(char));
   memset(previous_date_buf, 0, BUFFER_SIZE);
@@ -1075,6 +1122,9 @@ static void setup_time_and_date_callback(void* data) {
     
   setup_moon_image_layer();
     
+    vibrate_for_notification();
+    
+    
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
     layer_mark_dirty(window_get_root_layer(window));
@@ -1086,6 +1136,11 @@ static void setup_time_and_date_callback(void* data) {
 }
 
 static void init(void) {
+    //delete this -- test vibration
+    //next_vibration_time = malloc(sizeof(TIME));
+    //next_vibration_time->hour = 15;
+    //next_vibration_time->min  = 45;
+    
   config = malloc(sizeof(CONFIG));
   config->day_countdown = ASTRONOMICAL;
     
