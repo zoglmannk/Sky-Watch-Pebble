@@ -703,6 +703,42 @@ static void draw_bar_graph(Layer *layer, GContext* ctx, int percent_complete) {
     graphics_fill_rect(ctx, (GRect) { .origin = { 3, 42 - height}, .size = { 5, height } }, 0, 0);
 }
 
+static void draw_battery_graph(Layer *layer, GContext* ctx) {
+    
+    BatteryChargeState battery_state = battery_state_service_peek();
+    
+    if(current_background_color == GColorBlack) {
+        graphics_context_set_stroke_color(ctx, GColorWhite);
+        graphics_context_set_fill_color(ctx, GColorWhite);
+    } else {
+        graphics_context_set_stroke_color(ctx, GColorBlack);
+        graphics_context_set_fill_color(ctx, GColorBlack);
+    }
+    
+    int y_offset = 9;
+
+    //draw plus
+    graphics_draw_line(ctx, (GPoint) { 4, 2 }, (GPoint) { 6, 2 } );
+    graphics_draw_line(ctx, (GPoint) { 5, 0 }, (GPoint) { 5, 4 } );
+    
+    graphics_draw_rect(ctx, (GRect) { .origin = { 4, y_offset-2 }, .size = { 3,  2 } }); //draw top of battery button
+    graphics_draw_rect(ctx, (GRect) { .origin = { 3, y_offset+0 }, .size = { 5, 20 } }); //draw battery outline
+    
+    graphics_draw_line(ctx, (GPoint) { 1, y_offset +5 }, (GPoint) {  2, y_offset +5 } ); //75% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, y_offset +5 }, (GPoint) {  9, y_offset +5 } ); //75% mark right of bar
+    
+    graphics_draw_line(ctx, (GPoint) { 1, y_offset+10 }, (GPoint) {  2, y_offset+10 } ); //50% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, y_offset+10 }, (GPoint) {  9, y_offset+10 } ); //50% mark right of bar
+    
+    graphics_draw_line(ctx, (GPoint) { 1, y_offset+15 }, (GPoint) {  2, y_offset+15 } ); //25% mark left of bar
+    graphics_draw_line(ctx, (GPoint) { 8, y_offset+15 }, (GPoint) {  9, y_offset+15 } ); //25% mark right of bar
+    
+    int height = 21 * battery_state.charge_percent / 100;
+    graphics_fill_rect(ctx, (GRect) { .origin = { 3, y_offset + 21 - height}, .size = { 5, height } }, 0, 0);
+    
+    //graphics_draw_line(ctx, (GPoint) { 4, y_offset + 21 + 4 }, (GPoint) { 6, y_offset + 21 + 4 } ); //draw minus
+    
+}
 
 static void draw_bar_graph_for_sun(Layer *layer, GContext *ctx) {
     
@@ -942,7 +978,7 @@ static void window_load(Window *window) {
     
     
     //setup moon phase image layer
-    moon_image_layer = bitmap_layer_create((GRect) { .origin = { 144-25, 5+24+24+10}, .size = {20, 20} });
+    moon_image_layer = bitmap_layer_create((GRect) { .origin = { 144-21, 5+24+24+13}, .size = {20, 20} });
     bitmap_layer_set_alignment(moon_image_layer, GAlignCenter);
     layer_add_child(window_layer, bitmap_layer_get_layer(moon_image_layer));
     
@@ -992,6 +1028,12 @@ static void window_load(Window *window) {
   text_layer_set_text(text_layer6, line_6_buf);
   text_layer_set_text_alignment(text_layer6, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(text_layer6));
+    
+
+    //setup battery graph
+    Layer *battery_layer = layer_create((GRect) { .origin = { bounds.size.w - 15, 10 }, .size = { 15, 60 } });
+    layer_set_update_proc(battery_layer, draw_battery_graph);
+    layer_add_child(window_layer, battery_layer);
     
   layer_mark_dirty(window_get_root_layer(window));
     
