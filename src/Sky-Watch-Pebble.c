@@ -257,7 +257,7 @@ static TextLayer *text_layer5;
 static TextLayer *text_layer6;
 static TextLayer *time_layer;
 static TextLayer *date_layer;
-
+static TextLayer *notification_layer = 0;
 
 
 #define BUFFER_SIZE 25
@@ -269,6 +269,9 @@ static char* line_5_buf;
 static char* line_6_buf;
 static char* time_buf;
 static char* date_buf;
+static char* notification_buf;
+
+static GColor current_notification_background_color;
 static GColor current_background_color;
 
 static void setup_color_scheme(bool black_background) {
@@ -1029,6 +1032,7 @@ static void window_load(Window *window) {
     layer_set_update_proc(battery_layer, draw_battery_graph);
     layer_add_child(window_layer, battery_layer);
     
+    
   layer_mark_dirty(window_get_root_layer(window));
     
 }
@@ -1041,6 +1045,7 @@ static void window_unload(Window *window) {
   text_layer_destroy(text_layer5);
   text_layer_destroy(time_layer);
   text_layer_destroy(date_layer);
+  text_layer_destroy(notification_layer);
   bitmap_layer_destroy(moon_image_layer);
     
   if(moon_image != 0) {
@@ -1050,10 +1055,58 @@ static void window_unload(Window *window) {
      
 }
 
+static TIME *next_notification_time = 0;
+static void notification_wink(void) {
+    
+    if(next_notification_time == 0) {
+        return;
+    }
+    
+    int minute_of_day = min_of_day();
+    int next_notification_min_of_day = next_notification_time->hour*60 + next_notification_time->min;
+    
+    if(next_notification_min_of_day == minute_of_day) {
+        
+        if(notification_layer == 0) {
+            //setup notification text -- covers up rotating lines of text
+            Layer *window_layer = window_get_root_layer(window);
+            GRect bounds = layer_get_bounds(window_layer);
+            notification_layer = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+31 }, .size = { bounds.size.w, 35 } });
+            text_layer_set_font(notification_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
+            text_layer_set_background_color(notification_layer, GColorBlack);
+            text_layer_set_text_color(notification_layer, GColorWhite);
+            memset(notification_buf, 0, BUFFER_SIZE);
+            snprintf(notification_buf, BUFFER_SIZE, "Moon Set");
+            text_layer_set_text(notification_layer, notification_buf);
+            text_layer_set_text_alignment(notification_layer, GTextAlignmentCenter);
+            layer_add_child(window_layer, text_layer_get_layer(notification_layer));
+        }
+    
+        if(current_notification_background_color == GColorWhite) {
+            current_notification_background_color = GColorBlack;
+            
+            text_layer_set_background_color(notification_layer, GColorBlack);
+            text_layer_set_text_color(notification_layer, GColorWhite);
+            
+        } else {
+            current_notification_background_color = GColorWhite;
+            
+            text_layer_set_background_color(notification_layer, GColorWhite);
+            text_layer_set_text_color(notification_layer, GColorBlack);
+        }
+    
+    } else if (minute_of_day > next_notification_min_of_day) {
+        text_layer_destroy(notification_layer);
+        notification_layer = 0;
+        
+        free(next_notification_time);
+        next_notification_time = 0;
+    }
+    
+}
 
 static int vibration_notification_counter = 0;
 static TIME *next_vibration_time = 0;
-
 static void vibrate_for_notification(void) {
     
     if(next_vibration_time == 0) {
@@ -1123,7 +1176,7 @@ static void setup_time_and_date_callback(void* data) {
   setup_moon_image_layer();
     
     vibrate_for_notification();
-    
+    notification_wink();
     
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
@@ -1137,9 +1190,13 @@ static void setup_time_and_date_callback(void* data) {
 
 static void init(void) {
     //delete this -- test vibration
-    //next_vibration_time = malloc(sizeof(TIME));
-    //next_vibration_time->hour = 15;
-    //next_vibration_time->min  = 45;
+    next_vibration_time = malloc(sizeof(TIME));
+    next_vibration_time->hour = 17;
+    next_vibration_time->min  = 15;
+    
+    next_notification_time = malloc(sizeof(TIME));
+    next_notification_time->hour = 17;
+    next_notification_time->min  = 15;
     
   config = malloc(sizeof(CONFIG));
   config->day_countdown = ASTRONOMICAL;
@@ -1155,6 +1212,7 @@ static void init(void) {
   line_6_buf = malloc(BUFFER_SIZE * sizeof(char));
   time_buf = malloc(BUFFER_SIZE * sizeof(char));
   date_buf = malloc(BUFFER_SIZE * sizeof(char));
+  notification_buf = malloc(BUFFER_SIZE * sizeof(char));
 
   app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 
@@ -1177,6 +1235,7 @@ static void deinit(void) {
   free(line_6_buf);
   free(time_buf);
   free(date_buf);
+  free(notification_buf);
 }
 
 
