@@ -62,6 +62,16 @@ static int min_of_day() {
     return 60*tm->tm_hour + tm->tm_min;
 }
 
+static int day_of_year() {
+    time_t* clock = malloc(sizeof(time_t));
+    time(clock); //update clock to current time
+    struct tm* tm = localtime(clock);
+    
+    free(clock);
+    
+    return tm->tm_yday;
+}
+
 static void is_day(SEARCH_RESULT *based_on, REMAINING* in) {
     int yesterday_day_end = 0;
     int today_day_begin = 0;
@@ -1016,6 +1026,7 @@ static void window_unload(Window *window) {
 }
 
 typedef struct notification {
+    int day_of_year;
     TIME *time;
     char *message;
     int vibration_count;
@@ -1053,10 +1064,18 @@ static void destroy_notification(NOTIFICATION *notification) {
 }
 
 static void wink_for_notification(NOTIFICATION *notification) {
+    if(notification == 0) {
+        if(notification_layer != 0) {
+            text_layer_destroy(notification_layer);
+            notification_layer = 0;
+        }
+        return;
+    }
+    
     int minute_of_day = min_of_day();
     int next_notification_min_of_day = notification->time->hour*60 + notification->time->min;
     
-    if(next_notification_min_of_day == minute_of_day) {
+    if(next_notification_min_of_day == minute_of_day && day_of_year() == notification->day_of_year) {
         
         if(notification_layer == 0) {
             //setup notification text -- covers up rotating lines of text
@@ -1066,10 +1085,13 @@ static void wink_for_notification(NOTIFICATION *notification) {
             text_layer_set_font(notification_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
             text_layer_set_background_color(notification_layer, GColorBlack);
             text_layer_set_text_color(notification_layer, GColorWhite);
-            text_layer_set_text(notification_layer, next_notification->message);
+            text_layer_set_text(notification_layer, notification->message);
             text_layer_set_text_alignment(notification_layer, GTextAlignmentCenter);
             layer_add_child(window_layer, text_layer_get_layer(notification_layer));
+        } else {
+            text_layer_set_text(notification_layer, notification->message);
         }
+
     
         if(notification->current_background_color == GColorWhite) {
             notification->current_background_color = GColorBlack;
@@ -1084,7 +1106,7 @@ static void wink_for_notification(NOTIFICATION *notification) {
             text_layer_set_text_color(notification_layer, GColorBlack);
         }
     
-    } else if (minute_of_day > next_notification_min_of_day && notification_layer!=0) {
+    } else {
         text_layer_destroy(notification_layer);
         notification_layer = 0;
     }
@@ -1093,6 +1115,10 @@ static void wink_for_notification(NOTIFICATION *notification) {
 
 
 static void vibrate_for_notification(NOTIFICATION *notification) {
+    if(notification == 0) {
+        return;
+    }
+    
     int minute_of_day = min_of_day();
     int next_notification_min_of_day = notification->time->hour*60 + notification->time->min;
     
@@ -1103,9 +1129,9 @@ static void vibrate_for_notification(NOTIFICATION *notification) {
                 50, 50, 100,
                 50, 50, 100,
                 50, 50, 100,
-                50, 50, 100,
+                50, 50, 100, //800ms
             
-                50, 50, 500,
+                50, 50, 500, //600ms
             
                 25, 25, 25,
                 25, 25, 25,
@@ -1113,7 +1139,7 @@ static void vibrate_for_notification(NOTIFICATION *notification) {
                 25, 25, 25,
                 25, 25, 25,
                 25, 25, 25,
-                25, 25, 25,
+                25, 25, 25, //525ms
             };
             VibePattern vibration_pattern = {
                 .durations = segments,
@@ -1134,18 +1160,39 @@ static bool test_and_update_notification(NOTIFICATION *working_notification, int
     int minute_of_day = min_of_day();
     int working_min_of_day = working_notification->time->hour*60 + working_notification->time->min;
     
-    if(event_minute_of_day > minute_of_day && event_minute_of_day < working_min_of_day) {
+
+    if( (event_minute_of_day >= minute_of_day &&
+         (event_minute_of_day < working_min_of_day || working_min_of_day < minute_of_day )
+        ) ||
+        working_notification->day_of_year!=day_of_year()) {
+        
+        working_notification->day_of_year = day_of_year();
         working_notification->time->hour = event_minute_of_day/60;
         working_notification->time->min  = event_minute_of_day%60;
         
         memset(working_notification->message, 0, BUFFER_SIZE);
         snprintf(working_notification->message, BUFFER_SIZE, message);
         
+        //APP_LOG(APP_LOG_LEVEL_DEBUG, "found.. event_minute_of_day: %d   minute_of_day: %d   working_min_of_day: %d", event_minute_of_day, minute_of_day, working_min_of_day);
         return true;
     }
     
     return false;
     
+}
+
+static bool are_notifications_equal(NOTIFICATION *n1, NOTIFICATION *n2) {
+    if(n1 == n2) {
+        return true;
+    }
+    
+    if(n1==0 || n2==0) {
+        return false;
+    }
+    
+    return n1->day_of_year == n2->day_of_year &&
+           n1->time->hour  == n2->time->hour &&
+           n1->time->min   == n2->time->min;
 }
 
 static void setup_and_handle_notifications() {
@@ -1157,30 +1204,35 @@ static void setup_and_handle_notifications() {
     }
     
     NOTIFICATION* working_notification = create_notification(BUFFER_SIZE);
-    working_notification->time->hour = 23;
-    working_notification->time->min  = 59;
+    working_notification->time->hour = 0;
+    working_notification->time->min  = 0;
+    working_notification->day_of_year = -1;
     bool found_notification = false;
     
     if(config->notify_on_solar_noon) {
-        found_notification = found_notification || test_and_update_notification(working_notification, result->today->solar_noon, "Solar Noon");
+        found_notification = test_and_update_notification(working_notification, result->today->solar_noon, "Solar Noon") || found_notification;
     }
     
     if(config->notify_on_solar_midnight) {
-        found_notification = found_notification || test_and_update_notification(working_notification, result->today->solar_midnight, "Solar Midnight");
+        found_notification = test_and_update_notification(working_notification, result->today->solar_midnight, "Solar Midnight") || found_notification;
     }
     
     if(config->notify_on_sunrise) {
-        found_notification = found_notification || test_and_update_notification(working_notification, result->today->sun_rise, "Sunrise");
+        found_notification = test_and_update_notification(working_notification, result->today->sun_rise, "Sunrise") || found_notification;
     }
     
     if(config->notify_on_sunset) {
-        found_notification = found_notification || test_and_update_notification(working_notification, result->today->sun_set, "Sunset");
+        found_notification = test_and_update_notification(working_notification, result->today->sun_set, "Sunset") || found_notification;
     }
     
-    //int test_mins = (8+12)*60 + 51;
-    //found_notification = found_notification || test_and_update_notification(working_notification, test_mins, "Test Notification");
     
-    if(found_notification) {
+//    int test_mins = (12)*60 + 20;
+//    found_notification = test_and_update_notification(working_notification, test_mins, "Test Notif. 1") || found_notification;
+//    test_mins = (12)*60 + 22;
+//    found_notification = test_and_update_notification(working_notification, test_mins, "Test Notif. 2") || found_notification;
+    
+    
+    if(found_notification && !are_notifications_equal(working_notification, next_notification)) {
         if(next_notification != 0) {
             destroy_notification(next_notification);
         }
@@ -1190,10 +1242,10 @@ static void setup_and_handle_notifications() {
         destroy_notification(working_notification);
     }
     
-    if(next_notification!=0) {
-        vibrate_for_notification(next_notification);
-        wink_for_notification(next_notification);
-    }
+    
+    
+    vibrate_for_notification(next_notification);
+    wink_for_notification(next_notification);
     
     
     destroy_search_result(result);
