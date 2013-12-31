@@ -1084,7 +1084,7 @@ static void wink_for_notification(NOTIFICATION *notification) {
             text_layer_set_text_color(notification_layer, GColorBlack);
         }
     
-    } else if (minute_of_day > next_notification_min_of_day) {
+    } else if (minute_of_day > next_notification_min_of_day && notification_layer!=0) {
         text_layer_destroy(notification_layer);
         notification_layer = 0;
     }
@@ -1177,8 +1177,8 @@ static void setup_and_handle_notifications() {
         found_notification = found_notification || test_and_update_notification(working_notification, result->today->sun_set, "Sunset");
     }
     
-    //int test_mins = (8+12)*60 + 9;
-    //found_notification = found_notification || test_and_update_notification(working_notification, test_mins, "Test Notification");
+    int test_mins = (8+12)*60 + 30;
+    found_notification = found_notification || test_and_update_notification(working_notification, test_mins, "Test Notification");
     
     if(found_notification) {
         if(next_notification != 0) {
@@ -1217,7 +1217,7 @@ static void setup_time_and_date_callback(void* data) {
     
   setup_moon_image_layer();
     
-  setup_and_handle_notifications();
+  //setup_and_handle_notifications();
     
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
