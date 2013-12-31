@@ -8,6 +8,10 @@ typedef enum {HORIZON, CIVIL, NAUTICAL, ASTRONOMICAL} DAY_COUNT_DOWN;
 
 typedef struct config {
     DAY_COUNT_DOWN day_countdown;
+    bool notify_on_solar_noon;
+    bool notify_on_solar_midnight;
+    bool notify_on_sunrise;
+    bool notify_on_sunset;
 } CONFIG;
 
 static CONFIG *config;
@@ -269,9 +273,7 @@ static char* line_5_buf;
 static char* line_6_buf;
 static char* time_buf;
 static char* date_buf;
-static char* notification_buf;
 
-static GColor current_notification_background_color;
 static GColor current_background_color;
 
 static void setup_color_scheme(bool black_background) {
@@ -339,7 +341,7 @@ static void setup_color_scheme(bool black_background) {
     }
 }
 
-static void setup_day_countdown_bufs(void) {
+static SEARCH_RESULT* create_search_result(void) {
     DATA *yesterday_data = malloc(sizeof(DATA));
     DATA *today_data = malloc(sizeof(DATA));
     DATA *tomorrow_data = malloc(sizeof(DATA));
@@ -349,6 +351,18 @@ static void setup_day_countdown_bufs(void) {
     result->today = today_data;
     result->tomorrow = tomorrow_data;
     
+    return result;
+}
+
+static void destroy_search_result(SEARCH_RESULT *result) {
+    free(result->yesterday);
+    free(result->today);
+    free(result->tomorrow);
+    free(result);
+}
+
+static void setup_day_countdown_bufs(void) {
+    SEARCH_RESULT *result = create_search_result();
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
 
@@ -376,21 +390,11 @@ static void setup_day_countdown_bufs(void) {
         free(remaining);
     }
     
-    free(yesterday_data);
-    free(today_data);
-    free(tomorrow_data);
-    free(result);
+    destroy_search_result(result);
 }
 
 static void setup_moon_countdown_bufs(void) {
-    DATA *yesterday_data = malloc(sizeof(DATA));
-    DATA *today_data = malloc(sizeof(DATA));
-    DATA *tomorrow_data = malloc(sizeof(DATA));
-    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
-    result->yesterday = yesterday_data;
-    result->today = today_data;
-    result->tomorrow = tomorrow_data;
-    
+    SEARCH_RESULT *result = create_search_result();
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
 
@@ -416,10 +420,7 @@ static void setup_moon_countdown_bufs(void) {
         free(remaining);
     }
     
-    free(yesterday_data);
-    free(today_data);
-    free(tomorrow_data);
-    free(result);
+    destroy_search_result(result);
 }
 
 
@@ -449,14 +450,7 @@ static void setup_no_data_tiny_bufs(void) {
 }
 
 static void setup_choosen_twilight_tiny_bufs(void) {
-    DATA *yesterday_data = malloc(sizeof(DATA));
-    DATA *today_data = malloc(sizeof(DATA));
-    DATA *tomorrow_data = malloc(sizeof(DATA));
-    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
-    result->yesterday = yesterday_data;
-    result->today = today_data;
-    result->tomorrow = tomorrow_data;
-    
+    SEARCH_RESULT *result = create_search_result();
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
     int twilight_begin = 0;
@@ -499,22 +493,12 @@ static void setup_choosen_twilight_tiny_bufs(void) {
         free(begin);
     }
     
-    free(yesterday_data);
-    free(today_data);
-    free(tomorrow_data);
-    free(result);
+    destroy_search_result(result);
 }
 
 /** Set this up to get called instead of setup_moon_tiny_bufs **/
 static void setup_sunrise_sunset_tiny_bufs(void) {
-    DATA *yesterday_data = malloc(sizeof(DATA));
-    DATA *today_data = malloc(sizeof(DATA));
-    DATA *tomorrow_data = malloc(sizeof(DATA));
-    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
-    result->yesterday = yesterday_data;
-    result->today = today_data;
-    result->tomorrow = tomorrow_data;
-    
+    SEARCH_RESULT *result = create_search_result();
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
     if(ret_result == 0) {
@@ -531,10 +515,7 @@ static void setup_sunrise_sunset_tiny_bufs(void) {
         free(time);
     }
     
-    free(yesterday_data);
-    free(today_data);
-    free(tomorrow_data);
-    free(result);
+    destroy_search_result(result);
 }
 
 static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
@@ -561,14 +542,7 @@ static void moon_event_to_char(EVENT *event, char *buf, int buffer_size) {
 }
 
 static void setup_moon_tiny_bufs(void) {
-    DATA *yesterday_data = malloc(sizeof(DATA));
-    DATA *today_data = malloc(sizeof(DATA));
-    DATA *tomorrow_data = malloc(sizeof(DATA));
-    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
-    result->yesterday = yesterday_data;
-    result->today = today_data;
-    result->tomorrow = tomorrow_data;
-    
+    SEARCH_RESULT *result = create_search_result();
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
     
@@ -585,10 +559,7 @@ static void setup_moon_tiny_bufs(void) {
         free(events);
     }
     
-    free(yesterday_data);
-    free(today_data);
-    free(tomorrow_data);
-    free(result);
+    destroy_search_result(result);
 }
 
 typedef enum {TWILIGHT, SUNRISE_SUNSET, MOON_RISE_SET} TINY_DISPLAY;
@@ -775,15 +746,7 @@ static GBitmap *moon_image = (void*) 0;
 //WARNING: something should be done to make this more accurate. The Age of Moon is not that accurate.
 //it can skip days!!
 static void setup_moon_image_layer() {
-    
-    DATA *yesterday_data = malloc(sizeof(DATA));
-    DATA *today_data = malloc(sizeof(DATA));
-    DATA *tomorrow_data = malloc(sizeof(DATA));
-    SEARCH_RESULT *result = malloc(sizeof(SEARCH_RESULT));
-    result->yesterday = yesterday_data;
-    result->today = today_data;
-    result->tomorrow = tomorrow_data;
-    
+    SEARCH_RESULT *result = create_search_result();
     SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
     
     if(ret_result != 0) {
@@ -905,10 +868,7 @@ static void setup_moon_image_layer() {
         free(remaining);
     }
     
-    free(yesterday_data);
-    free(today_data);
-    free(tomorrow_data);
-    free(result);
+    destroy_search_result(result);
     
 }
 
@@ -1055,15 +1015,46 @@ static void window_unload(Window *window) {
      
 }
 
-static TIME *next_notification_time = 0;
-static void notification_wink(void) {
+typedef struct notification {
+    TIME *time;
+    char *message;
+    int vibration_count;
+    GColor current_background_color;
+} NOTIFICATION;
+
+NOTIFICATION *next_notification;
+
+/**
+ message is copied
+ **/
+static NOTIFICATION* create_notification(int buffer_size) {
+    NOTIFICATION *ret = malloc(sizeof(NOTIFICATION));
+    memset(ret, 0, sizeof(NOTIFICATION));
     
-    if(next_notification_time == 0) {
+    ret->time = malloc(sizeof(TIME));
+    memset(ret->time, 0, sizeof(TIME));
+    
+    ret->message = malloc(sizeof(char)*buffer_size);
+    memset(ret->message, 0, sizeof(char)*buffer_size);
+    
+    ret->current_background_color = GColorBlack;
+    
+    return ret;
+}
+
+static void destroy_notification(NOTIFICATION *notification) {
+    if(notification == 0) {
         return;
     }
     
+    free(notification->time);
+    free(notification->message);
+    free(notification);
+}
+
+static void wink_for_notification(NOTIFICATION *notification) {
     int minute_of_day = min_of_day();
-    int next_notification_min_of_day = next_notification_time->hour*60 + next_notification_time->min;
+    int next_notification_min_of_day = notification->time->hour*60 + notification->time->min;
     
     if(next_notification_min_of_day == minute_of_day) {
         
@@ -1071,25 +1062,23 @@ static void notification_wink(void) {
             //setup notification text -- covers up rotating lines of text
             Layer *window_layer = window_get_root_layer(window);
             GRect bounds = layer_get_bounds(window_layer);
-            notification_layer = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+31 }, .size = { bounds.size.w, 35 } });
+            notification_layer = text_layer_create((GRect) { .origin = { 0, 0+24+24+24+30 }, .size = { bounds.size.w, 36 } });
             text_layer_set_font(notification_layer, fonts_get_system_font("RESOURCE_ID_GOTHIC_24_BOLD"));
             text_layer_set_background_color(notification_layer, GColorBlack);
             text_layer_set_text_color(notification_layer, GColorWhite);
-            memset(notification_buf, 0, BUFFER_SIZE);
-            snprintf(notification_buf, BUFFER_SIZE, "Moon Set");
-            text_layer_set_text(notification_layer, notification_buf);
+            text_layer_set_text(notification_layer, next_notification->message);
             text_layer_set_text_alignment(notification_layer, GTextAlignmentCenter);
             layer_add_child(window_layer, text_layer_get_layer(notification_layer));
         }
     
-        if(current_notification_background_color == GColorWhite) {
-            current_notification_background_color = GColorBlack;
+        if(notification->current_background_color == GColorWhite) {
+            notification->current_background_color = GColorBlack;
             
             text_layer_set_background_color(notification_layer, GColorBlack);
             text_layer_set_text_color(notification_layer, GColorWhite);
             
         } else {
-            current_notification_background_color = GColorWhite;
+            notification->current_background_color = GColorWhite;
             
             text_layer_set_background_color(notification_layer, GColorWhite);
             text_layer_set_text_color(notification_layer, GColorBlack);
@@ -1098,27 +1087,18 @@ static void notification_wink(void) {
     } else if (minute_of_day > next_notification_min_of_day) {
         text_layer_destroy(notification_layer);
         notification_layer = 0;
-        
-        free(next_notification_time);
-        next_notification_time = 0;
     }
     
 }
 
-static int vibration_notification_counter = 0;
-static TIME *next_vibration_time = 0;
-static void vibrate_for_notification(void) {
-    
-    if(next_vibration_time == 0) {
-        return;
-    }
-    
-    int minute_of_day = min_of_day();
-    int next_vibration_min_of_day = next_vibration_time->hour*60 + next_vibration_time->min;
-    
-    if(minute_of_day == next_vibration_min_of_day) {
 
-        if(vibration_notification_counter % 3 == 0) {
+static void vibrate_for_notification(NOTIFICATION *notification) {
+    int minute_of_day = min_of_day();
+    int next_notification_min_of_day = notification->time->hour*60 + notification->time->min;
+    
+    if(minute_of_day == next_notification_min_of_day) {
+
+        if(notification->vibration_count % 3 == 0 && notification->vibration_count < 6) {
             static const uint32_t const segments[] = {
                 50, 50, 100,
                 50, 50, 100,
@@ -1144,16 +1124,78 @@ static void vibrate_for_notification(void) {
         
         }
     
-        vibration_notification_counter++;
-        
-        if(vibration_notification_counter >= 7) {
-            vibration_notification_counter = 0;
-            free(next_vibration_time);
-            next_vibration_time = 0;
-        }
+        notification->vibration_count++;
         
     }
     
+}
+
+static bool test_and_update_notification(NOTIFICATION *working_notification, int event_minute_of_day, const char* message) {
+    int minute_of_day = min_of_day();
+    int working_min_of_day = working_notification->time->hour*60 + working_notification->time->min;
+    
+    if(event_minute_of_day > minute_of_day && event_minute_of_day < working_min_of_day) {
+        working_notification->time->hour = event_minute_of_day/60;
+        working_notification->time->min  = event_minute_of_day%60;
+        
+        memset(working_notification->message, 0, BUFFER_SIZE);
+        snprintf(working_notification->message, BUFFER_SIZE, message);
+        
+        return true;
+    }
+    
+    return false;
+    
+}
+
+static void setup_and_handle_notifications() {
+    SEARCH_RESULT *result = create_search_result();
+    SEARCH_RESULT *ret_result = locate_data_for_current_date(result);
+    
+    if(ret_result == 0) {
+        return;
+    }
+    
+    NOTIFICATION* working_notification = create_notification(BUFFER_SIZE);
+    working_notification->time->hour = 23;
+    working_notification->time->min  = 59;
+    bool found_notification = false;
+    
+    if(config->notify_on_solar_noon) {
+        found_notification = found_notification || test_and_update_notification(working_notification, result->today->solar_noon, "Solar Noon");
+    }
+    
+    if(config->notify_on_solar_midnight) {
+        found_notification = found_notification || test_and_update_notification(working_notification, result->today->solar_midnight, "Solar Midnight");
+    }
+    
+    if(config->notify_on_sunrise) {
+        found_notification = found_notification || test_and_update_notification(working_notification, result->today->sun_rise, "Sunrise");
+    }
+    
+    if(config->notify_on_sunset) {
+        found_notification = found_notification || test_and_update_notification(working_notification, result->today->sun_set, "Sunset");
+    }
+    
+    //int test_mins = (8+12)*60 + 9;
+    //found_notification = found_notification || test_and_update_notification(working_notification, test_mins, "Test Notification");
+    
+    if(found_notification) {
+        if(next_notification != 0) {
+            destroy_notification(next_notification);
+        }
+        
+        next_notification = working_notification;
+    }
+    
+    if(next_notification!=0) {
+        vibrate_for_notification(next_notification);
+        wink_for_notification(next_notification);
+    }
+    
+    
+    destroy_search_result(result);
+
 }
 
 static void setup_time_and_date_callback(void* data) {
@@ -1175,8 +1217,7 @@ static void setup_time_and_date_callback(void* data) {
     
   setup_moon_image_layer();
     
-    vibrate_for_notification();
-    notification_wink();
+  setup_and_handle_notifications();
     
   //if the time changed, refresh the window
   if(!strcmp(previous_time_buf, time_buf) || !strcmp(previous_date_buf, date_buf)) { 
@@ -1189,17 +1230,14 @@ static void setup_time_and_date_callback(void* data) {
 }
 
 static void init(void) {
-    //delete this -- test vibration
-    next_vibration_time = malloc(sizeof(TIME));
-    next_vibration_time->hour = 17;
-    next_vibration_time->min  = 15;
-    
-    next_notification_time = malloc(sizeof(TIME));
-    next_notification_time->hour = 17;
-    next_notification_time->min  = 15;
+  next_notification = 0;
     
   config = malloc(sizeof(CONFIG));
   config->day_countdown = ASTRONOMICAL;
+  config->notify_on_solar_noon = true;
+  config->notify_on_solar_midnight = true;
+  config->notify_on_sunrise = true;
+  config->notify_on_sunset = true;
     
   force_display_tiny_bufs = true;
   next_tiny_display = TWILIGHT;
@@ -1212,7 +1250,6 @@ static void init(void) {
   line_6_buf = malloc(BUFFER_SIZE * sizeof(char));
   time_buf = malloc(BUFFER_SIZE * sizeof(char));
   date_buf = malloc(BUFFER_SIZE * sizeof(char));
-  notification_buf = malloc(BUFFER_SIZE * sizeof(char));
 
   app_timer_register(1000, setup_time_and_date_callback, (void*) 0);
 
@@ -1235,7 +1272,12 @@ static void deinit(void) {
   free(line_6_buf);
   free(time_buf);
   free(date_buf);
-  free(notification_buf);
+
+  if(next_notification != 0) {
+    destroy_notification(next_notification);
+    next_notification = 0;
+  }
+
 }
 
 
