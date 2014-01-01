@@ -772,7 +772,7 @@ static void setup_moon_image_layer() {
         //APP_LOG(APP_LOG_LEVEL_DEBUG, "set image to waning_half_white moon age: %d", result->today->moon_age);
         
         switch (result->today->moon_age) {
-            case 1:
+            case 0:
                 if(remaining->is_object_up) {
                     moon_image = gbitmap_create_with_resource(RESOURCE_ID_MOON_NEW_WHITE);
                 } else {
@@ -780,6 +780,7 @@ static void setup_moon_image_layer() {
                 }
                 //APP_LOG(APP_LOG_LEVEL_DEBUG, "case 1");
                 break;
+            case 1:
             case 2:
             case 3:
             case 4:
